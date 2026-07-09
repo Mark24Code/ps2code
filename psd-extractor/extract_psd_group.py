@@ -119,11 +119,18 @@ def list_groups(psd_path, include_hidden=False):
     return groups
 
 
-def composite_group(group, respect_visibility=True, background_color=None):
+def composite_group(group, respect_visibility=True, background_color=None,
+                    canvas_size=None):
     """合成一个图层组，返回 PIL Image。
 
-    自动处理智能对象；如果 group.composite() 抛出异常，
-    自动降级到逐层合成。
+    自动处理智能对象和图层特效（投影、描边等）；
+    如果 group.composite() 抛出异常，自动降级到逐层合成。
+
+    参数
+    ----------
+    canvas_size : (width, height) | None
+        PSD 画布尺寸。指定后结果会被裁剪到画布范围内，
+        避免图层或特效超出设计稿边界。
     """
     if respect_visibility and not group.visible:
         print(f"  ⚠ 组 '{group.name}' 已隐藏，跳过")
@@ -143,6 +150,19 @@ def composite_group(group, respect_visibility=True, background_color=None):
         return None
     if image.mode != "RGBA":
         image = image.convert("RGBA")
+
+    # 裁剪到画布范围（保留特效的同时不超出设计稿边界）
+    if canvas_size:
+        clip_bbox = _bbox_intersect(_bbox(group), canvas_size[0], canvas_size[1])
+        if clip_bbox is None:
+            print(f"  ⚠ 组 '{group.name}' 完全在画布之外")
+            return None
+        gb = _bbox(group)
+        # 裁剪区域在合成图上的坐标
+        crop = (clip_bbox[0] - gb[0], clip_bbox[1] - gb[1],
+                clip_bbox[2] - gb[0], clip_bbox[3] - gb[1])
+        image = image.crop(crop)
+
     if background_color:
         bg = Image.new("RGBA", image.size, tuple(background_color) + (255,))
         bg.paste(image, (0, 0), image)
@@ -193,7 +213,8 @@ def extract_group(psd_path, group_names, output=None, output_dir=None,
 
         for gi, group in enumerate(groups):
             print(f"  🎨 合成组 '{name}'…")
-            image = composite_group(group, respect_visibility, background_color)
+            image = composite_group(group, respect_visibility, background_color,
+                                     canvas_size=(psd.width, psd.height))
             if image is None:
                 continue
 
