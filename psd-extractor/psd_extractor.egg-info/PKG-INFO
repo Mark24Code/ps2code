@@ -1,0 +1,106 @@
+Metadata-Version: 2.4
+Name: psd-extractor
+Version: 0.1.0
+Summary: Extract images from specific layer groups in PSD files, with smart object support
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: psd-tools>=1.9.28
+Requires-Dist: Pillow>=9.0.0
+Requires-Dist: click>=8.0.0
+
+# psd-extractor
+
+Extract images from **specific layer groups** in PSD design files.
+
+Uses [`psd-tools`](https://github.com/psd-tools/psd-tools) under the hood and
+adds a convenient CLI + Python API for finding layer groups by name,
+compositing them (merging all visible sub-layers into one image), and
+handling **smart objects** with a graceful fallback path.
+
+## Features
+
+- **Named group extraction** — find one or more groups by name and render each
+  as a flat PNG/JPEG/WEBP.
+- **Smart object support** — psd-tools renders smart-object layers natively;
+  if the built-in `composite()` fails, a manual layer-by-layer fallback kicks
+  in.
+- **Respect / ignore visibility** — skip hidden layers or override for a full
+  dump.
+- **Bulk export** — `--all` composites every top-level visible group.
+- **Introspection** — `psd-extract list` / `psd-extract layers` to browse the
+  layer hierarchy before extracting.
+
+## Installation
+
+```bash
+pip install -r requirements.txt
+# or
+pip install -e .
+```
+
+## CLI Usage
+
+```bash
+# 1. See what groups are in your PSD
+psd-extract list design.psd
+
+# 2. List every layer (helpful for finding group names)
+psd-extract layers design.psd
+
+# 3. Extract one group
+psd-extract extract design.psd -g "主视觉" -o hero.png
+
+# 4. Extract multiple groups
+psd-extract extract design.psd -g "背景" -g "按钮" -o ./output/
+
+# 5. Extract ALL groups
+psd-extract extract design.psd --all -o ./output/
+
+# 6. Debug smart object issues
+psd-extract -vv extract design.psd -g "有问题组" -o debug.png
+
+# 7. JPEG with white background
+psd-extract extract design.psd -g "商品图" --format JPEG --background-color 255,255,255
+```
+
+## Python API
+
+```python
+from psd_extractor import PSDLayerExtractor
+
+with PSDLayerExtractor("design.psd") as extractor:
+    # Browse groups
+    for g in extractor.list_groups():
+        print(g["name"], g["visible"])
+
+    # Composite a group in-memory
+    from psd_tools.api.layers import Group
+    groups = extractor.find_groups_by_name("主视觉")
+    if groups:
+        img = extractor.composite_group(groups[0])
+        img.save("output.png")
+
+    # Or use the high-level extract helper
+    extractor.extract_group("主视觉", output_path="output.png")
+```
+
+## How it works
+
+1. Open the PSD via `psd_tools.PSDImage.open()`.
+2. Walk `psd.descendants()` to find `Group` layers whose name matches.
+3. Call `group.composite(force=True)` — this merges every visible child
+   (pixel, shape, text, *smart object*) into a single RGBA bitmap.
+4. If the composite call throws (rare — some smart-object or clipping-mask
+   chains trigger it), fall back to compositing each child layer individually.
+5. Save as PNG (preserving transparency), JPEG (with optional background
+   colour), or WEBP.
+
+## Limitations
+
+- **Linked smart objects** that reference external files require those files
+  to be present on disk. psd-tools may not resolve them otherwise — a warning
+  is logged and the layer is skipped.
+- **Layer effects** (drop shadow, stroke, etc.) are applied by psd-tools'
+  `composite()` — the manual fallback does **not** re-apply effects.
+- Very large PSDs (>several GB) may strain memory.
+- CMYK / 16-bit / 32-bit PSDs are converted to 8-bit RGBA on read.
