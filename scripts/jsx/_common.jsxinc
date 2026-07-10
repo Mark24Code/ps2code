@@ -1,0 +1,82 @@
+// 公共函数与 polyfill(ExtendScript ES3)。由 Bridge 拼接在具体脚本之前。
+
+if (typeof String.prototype.trim !== "function") {
+    String.prototype.trim = function () {
+        return this.replace(/^[\s﻿\xA0]+|[\s﻿\xA0]+$/g, "");
+    };
+}
+
+var PS2 = {};
+
+PS2.log = [];
+PS2._push = function (m) { PS2.log.push(String(m)); };
+
+// 极简 JSON 序列化(仅覆盖本项目返回结构所需)
+PS2.stringify = function (obj) {
+    function esc(s) {
+        s = String(s);
+        return s.replace(/\\/g, "\\\\").replace(/"/g, "\\\"")
+                .replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+    }
+    function ser(v) {
+        if (v === null || v === undefined) return "null";
+        var t = typeof v;
+        if (t === "number") return isFinite(v) ? String(v) : "null";
+        if (t === "boolean") return v ? "true" : "false";
+        if (t === "string") return '"' + esc(v) + '"';
+        if (v instanceof Array) {
+            var a = [];
+            for (var i = 0; i < v.length; i++) a.push(ser(v[i]));
+            return "[" + a.join(",") + "]";
+        }
+        var parts = [];
+        for (var k in v) {
+            if (v.hasOwnProperty(k)) parts.push('"' + esc(k) + '":' + ser(v[k]));
+        }
+        return "{" + parts.join(",") + "}";
+    }
+    return ser(obj);
+};
+
+PS2.result = function (ok, data, error) {
+    return PS2.stringify({ ok: ok, data: data || {}, log: PS2.log, error: error || "" });
+};
+
+// 打开或复用目标文档
+PS2.openOrReuse = function (targetPath) {
+    var doc = null;
+    for (var d = 0; d < app.documents.length; d++) {
+        try {
+            if (app.documents[d].fullName.fsName === new File(targetPath).fsName) {
+                doc = app.documents[d];
+                break;
+            }
+        } catch (e) {}
+    }
+    if (doc === null) {
+        var f = new File(targetPath);
+        if (!f.exists) throw new Error("文件不存在: " + targetPath);
+        doc = app.open(f);
+    }
+    app.activeDocument = doc;
+    return doc;
+};
+
+// 递归查找所有 LayerSet
+PS2.findAllLayerSets = function (container) {
+    var result = [];
+    for (var i = 0; i < container.layers.length; i++) {
+        var layer = container.layers[i];
+        if (layer.typename === "LayerSet") {
+            result.push(layer);
+            result = result.concat(PS2.findAllLayerSets(layer));
+        }
+    }
+    return result;
+};
+
+// 解析 Bridge 注入的参数
+PS2.params = function () {
+    if (typeof PS2CODE_PARAMS === "undefined") return {};
+    return eval("(" + PS2CODE_PARAMS + ")");
+};

@@ -1,0 +1,28 @@
+appId: com.ps2code.app
+productName: PS2Code
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+# JSX 脚本随包(供 PhotoshopBridge 运行时读取)
+extraResources:
+  - from: scripts/jsx
+    to: jsx
+    filter:
+      - '**/*'
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+mac:
+  target:
+    - dmg
+  category: public.app-category.graphics-design
+  artifactName: ${productName}-${version}-${arch}.${ext}
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-${version}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

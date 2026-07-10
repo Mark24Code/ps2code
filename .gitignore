@@ -1,4 +1,10 @@
 target
-*.psd
 output
-*.png
+node_modules
+out
+dist
+.DS_Store
+*.log
+
+# 设计稿与导出产物(测试资源除外由用户决定)
+design-drafts/*.psd
