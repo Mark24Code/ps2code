@@ -370,6 +370,251 @@ body {
   }
 }
 
+/* ---------- Markdown 渲染 ---------- */
+.md-body {
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* 段落 */
+.md-body p {
+  margin: 0 0 8px;
+}
+.md-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* 标题 */
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4,
+.md-body h5,
+.md-body h6 {
+  margin: 16px 0 8px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+}
+.md-body h1 { font-size: 1.4em; }
+.md-body h2 { font-size: 1.25em; }
+.md-body h3 { font-size: 1.15em; }
+.md-body h4 { font-size: 1.05em; }
+.md-body h5,
+.md-body h6 { font-size: 1em; }
+
+.md-body h1:first-child,
+.md-body h2:first-child,
+.md-body h3:first-child,
+.md-body h4:first-child {
+  margin-top: 0;
+}
+
+/* 粗体 / 斜体 */
+.md-body strong { font-weight: 600; }
+.md-body em { font-style: italic; }
+
+/* 删除线 */
+.md-body del { text-decoration: line-through; opacity: 0.7; }
+
+/* 链接 */
+.md-body a {
+  color: var(--brand);
+  text-decoration: none;
+}
+.md-body a:hover {
+  text-decoration: underline;
+}
+
+/* 列表 */
+.md-body ul,
+.md-body ol {
+  margin: 4px 0 8px;
+  padding-left: 24px;
+}
+.md-body li {
+  margin-bottom: 2px;
+}
+.md-body li > ul,
+.md-body li > ol {
+  margin-bottom: 0;
+}
+
+/* 任务列表 */
+.md-body input[type="checkbox"] {
+  margin-right: 6px;
+  accent-color: var(--brand);
+}
+
+/* 分隔线 */
+.md-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 14px 0;
+}
+
+/* --- 行内代码 --- */
+.md-code-inline {
+  background: var(--surface-2);
+  color: #c0392b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  word-break: break-word;
+}
+
+/* --- 代码块 --- */
+.md-code-block {
+  margin: 10px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8f9fa;
+}
+
+.md-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.md-code-lang {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-3);
+  font-weight: 600;
+}
+
+.md-code-pre {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  background: transparent;
+  white-space: pre;
+  word-break: normal;
+  tab-size: 2;
+}
+
+/* --- 复制按钮(通用) --- */
+.md-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1;
+}
+.md-copy-btn:hover {
+  background: #fff;
+  border-color: var(--border);
+  color: var(--text);
+}
+.md-copy-btn:active {
+  background: var(--surface-2);
+}
+
+/* --- 表格 --- */
+.md-table-wrap {
+  margin: 10px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.md-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.md-table-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-3);
+  font-weight: 600;
+}
+
+.md-table-scroll {
+  overflow-x: auto;
+}
+
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.md-table th,
+.md-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.md-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.md-table tr:last-child td {
+  border-bottom: none;
+}
+
+.md-table tr:hover td {
+  background: #fafbfc;
+}
+
+/* --- 引用块 --- */
+.md-blockquote {
+  margin: 8px 0;
+  padding: 8px 14px;
+  border-left: 3px solid var(--brand);
+  background: var(--brand-soft);
+  border-radius: 0 6px 6px 0;
+  color: var(--text-2);
+}
+
+.md-blockquote p {
+  margin: 0;
+}
+
+/* --- 图片 --- */
+.md-img-fallback {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
 /* ---------- 欢迎页 ---------- */
 .welcome {
   height: 100%;

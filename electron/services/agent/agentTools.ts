@@ -83,7 +83,11 @@ export function createToolHandlers(deps: ToolDeps) {
         outputDir: cur.tmpDir
       })
       emit({ type: 'tool_result', name: 'export_groups', text: res.log.join('\n') })
-      return { content: [{ type: 'text', text: JSON.stringify(res.data) }], isError: !res.ok }
+      // 把日志细节也注入到返回数据中,方便 Agent 定位失败原因
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ ...res.data, _log: res.log }) }],
+        isError: !res.ok || (res.data.ok === 0 && res.data.err > 0)
+      }
     }
   }
 }

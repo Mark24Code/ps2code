@@ -63,7 +63,7 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     expect(res.ok).toBe(true)
     expect(res.data.files.length).toBe(1)
     expect(fake.lastScript).toContain('组84')
-    expect(fake.lastScript).toContain('exportGroup') // 来自 export-groups.jsx
+    expect(fake.lastScript).toContain('convertToSmartObject') // 来自 export-groups.jsx
   })
 
   it('mutate_layers 传递操作列表', async () => {

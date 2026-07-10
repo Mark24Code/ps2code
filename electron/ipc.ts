@@ -1,6 +1,6 @@
 import { app, dialog, ipcMain, shell } from 'electron'
-import { basename, dirname, join } from 'path'
-import { copyFile, mkdir, readdir } from 'fs/promises'
+import { basename, dirname, extname, join } from 'path'
+import { copyFile, mkdir, readdir, readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { IPC } from '../shared/ipc'
 import { dedupeFileName } from '../shared/naming'
@@ -24,6 +24,23 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.appVersion, () => app.getVersion())
   ipcMain.handle(IPC.openPath, (_e, p: string) => shell.openPath(p))
   ipcMain.handle(IPC.openExternal, (_e, url: string) => shell.openExternal(url))
+
+  // 读取本地文件并返回 base64 data URL(用于渲染进程展示本地图片)
+  ipcMain.handle(IPC.readFileAsDataUrl, async (_e, filePath: string) => {
+    const buf = await readFile(filePath)
+    const ext = extname(filePath).toLowerCase()
+    const mimeMap: Record<string, string> = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.bmp': 'image/bmp'
+    }
+    const mime = mimeMap[ext] ?? 'image/png'
+    return `data:${mime};base64,${buf.toString('base64')}`
+  })
 
   // ---------- 项目 ----------
   ipcMain.handle(IPC.projectImport, (_e, psdPath: string) => {

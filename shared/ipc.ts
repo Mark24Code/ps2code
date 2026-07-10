@@ -56,6 +56,9 @@ export const IPC = {
   // 更新
   checkUpdate: 'update:check',
 
+  // 读取本地文件为 data URL(用于 markdown 图片渲染)
+  readFileAsDataUrl: 'app:readFileAsDataUrl',
+
   // 窗口重新聚焦(用户可能在 PS 编辑后切回,用于自动刷新)
   windowFocused: 'app:windowFocused'
 } as const

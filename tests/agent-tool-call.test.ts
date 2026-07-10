@@ -81,7 +81,7 @@ describe('Agent 对话可调用脚本', () => {
     const res = await handlers.exportGroups({ names: ['组84'] })
     expect(res.isError).toBeFalsy()
     expect(fake.lastScript).toContain('组84')
-    expect(fake.lastScript).toContain('exportGroup')
+    expect(fake.lastScript).toContain('convertToSmartObject')
     expect(events.some((e) => e.type === 'tool_result' && e.name === 'export_groups')).toBe(true)
   })
 

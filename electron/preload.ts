@@ -91,6 +91,10 @@ const api = {
   pickPsd: (): Promise<string | null> => ipcRenderer.invoke(IPC.pickPsd),
   pickDir: (): Promise<string | null> => ipcRenderer.invoke(IPC.pickDir),
 
+  // 读取本地文件为 data URL
+  readFileAsDataUrl: (filePath: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.readFileAsDataUrl, filePath),
+
   // 窗口重新聚焦事件(用户可能在 PS 编辑后切回)
   onWindowFocused: (cb: () => void): (() => void) => {
     const listener = (): void => cb()
