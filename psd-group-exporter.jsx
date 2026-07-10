@@ -27,6 +27,7 @@ if (typeof String.prototype.trim !== "function") {
 // ============================================================================
 
 var g_logArea = null;   // 日志窗口的 edittext 控件引用
+var g_logWin  = null;   // 日志窗口引用（用于强制重绘）
 
 // ============================================================================
 //                              LOG WINDOW
@@ -41,9 +42,17 @@ function log(msg) {
     if (g_logArea && g_logArea.isValid) {
         try {
             g_logArea.text += msg + "\n";
+            // 滚动到底部：重设 text 后光标默认在末尾，配合窗口重绘即可看到最新行
         } catch (e) {
             // 控件失效则静默忽略
         }
+    }
+    // 关键：同步循环会占满主线程，ScriptUI 不会自动重绘，
+    // 必须手动 update() 强制刷新，否则日志看起来一直是空的。
+    if (g_logWin && g_logWin.isValid) {
+        try {
+            g_logWin.update();
+        } catch (e2) {}
     }
 }
 
@@ -53,6 +62,7 @@ function log(msg) {
  */
 function createLogWindow() {
     var win = new Window("palette", "PSD Group Exporter - 运行日志");
+    g_logWin = win;
     win.orientation = "column";
     win.alignChildren = ["fill", "top"];
     win.spacing = 8;
@@ -264,15 +274,12 @@ function showDialog() {
 // ============================================================================
 
 /**
- * 合并当前选中的图层 / 图层组。
- * 对于 LayerSet 会递归合并内部所有子节点到单个栅格图层。
+ * 将当前选中的图层 / 图层组转换为智能对象。
+ * 对于 LayerSet 会递归地把内部所有子节点打包合并进单个智能对象，
+ * 保留混合模式与图层样式的合成效果。
  */
-function mergeSelected() {
-    var desc = new ActionDescriptor();
-    var ref  = new ActionReference();
-    ref.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
-    desc.putReference(charIDToTypeID("null"), ref);
-    executeAction(charIDToTypeID("Mrg2"), desc, DialogModes.NO);
+function convertToSmartObject() {
+    executeAction(stringIDToTypeID("newPlacedLayer"), undefined, DialogModes.NO);
 }
 
 // ============================================================================
@@ -317,26 +324,30 @@ function exportPNG(doc, filePath) {
  * 导出单个图层组。
  *
  * 流程：
- *  1. 选中并复制图层组
- *  2. 合并副本（递归扁平化所有子节点 → 单个栅格图层）
- *  3. 按像素边界选中 → 复制合并 → 粘贴到新文档
- *  4. 裁剪透明边 → 导出 1x / 2x → 清理
+ *  1. 复制图层组副本（不改动原始组）
+ *  2. 将副本转为智能对象（递归打包所有子节点 → 单个智能对象，保留混合模式/图层样式）
+ *  3. 获取边界 → 校验非空
+ *  4. 将该智能对象图层「直接复制」到独立的临时文档（天然隔离，不受其它图层影响）
+ *  5. 从原文档删除副本，还原原文档到导出前状态
+ *  6. 裁剪透明边 → 导出 1x / 2x → 关闭临时文档
  */
-function exportGroup(doc, groupLayer, exportDir, export1x, export2x) {
-    var groupName = groupLayer.name;
+function exportGroup(doc, groupLayer, exportDir, export1x, export2x, exportName) {
+    var groupName  = groupLayer.name;
+    // 导出用的文件名（重名时由主循环追加序号后传入），未传则用组名
+    var outName    = (exportName != null && exportName !== "") ? exportName : groupName;
     log("----------------------------------------");
-    log("处理图层组: " + groupName);
+    log("处理图层组: " + groupName + (outName !== groupName ? "  → 导出名: " + outName : ""));
 
-    // ---- 1. 选中并复制组 ----
+    // ---- 1. 复制组副本（保留原始组不动） ----
     doc.activeLayer = groupLayer;
     var duplicated = groupLayer.duplicate();
     log("  已复制图层组");
 
-    // ---- 2. 合并副本（递归合并所有子节点 → 栅格图层） ----
+    // ---- 2. 将副本转为智能对象（递归打包所有子节点 → 单个智能对象） ----
     doc.activeLayer = duplicated;
-    mergeSelected();
+    convertToSmartObject();
     var mergedLayer = doc.activeLayer;
-    log("  已合并为栅格图层");
+    log("  已转为智能对象");
 
     // ---- 3. 获取边界 ----
     var b = mergedLayer.bounds;  // [left, top, right, bottom]
@@ -350,24 +361,30 @@ function exportGroup(doc, groupLayer, exportDir, export1x, export2x) {
         return;
     }
 
-    // ---- 4. 按像素边界选中并复制合并 ----
-    doc.selection.select([
-        [b[0].value, b[1].value],
-        [b[2].value, b[1].value],
-        [b[2].value, b[3].value],
-        [b[0].value, b[3].value]
-    ]);
-    doc.selection.copy(true);  // copy merged
-
-    // ---- 5. 创建临时文档并粘贴 ----
+    // ---- 4. 创建与原文档等尺寸的临时文档，并「仅」把智能对象图层复制过去 ----
+    //     直接 duplicate 单个图层，不经过选区/拷贝合并，
+    //     因此完全不会把其它图层（含同时匹配的父/子组）的内容带进来。
     var tempDoc = app.documents.add(
-        w, h, 72,
+        Math.ceil(doc.width.value), Math.ceil(doc.height.value), 72,
         groupName,
         NewDocumentMode.RGB,
         DocumentFill.TRANSPARENT
     );
-    tempDoc.paste();
-    log("  已创建临时文档");
+    // duplicate 需要在源文档上下文操作，目标为临时文档
+    app.activeDocument = doc;
+    mergedLayer.duplicate(tempDoc, ElementPlacement.PLACEATBEGINNING);
+    log("  已将智能对象复制到独立临时文档");
+
+    // ---- 5. 还原原文档：删除刚才的智能对象副本，原始图层组保持不变 ----
+    try {
+        mergedLayer.remove();
+        log("  已还原原文档（移除临时副本）");
+    } catch (e) {
+        log("  ⚠ 移除临时副本失败: " + e.message);
+    }
+
+    // 切换到临时文档进行后续裁剪/导出
+    app.activeDocument = tempDoc;
 
     // ---- 6. 裁剪透明像素 ----
     try {
@@ -379,7 +396,7 @@ function exportGroup(doc, groupLayer, exportDir, export1x, export2x) {
 
     // ---- 7. 导出 1x ----
     if (export1x) {
-        var path1x = new File(exportDir.fsName + "/" + groupName + ".png");
+        var path1x = new File(exportDir.fsName + "/" + outName + ".png");
         exportPNG(tempDoc, path1x);
         log("  ✓ 已导出 1x: " + path1x.fsName);
     }
@@ -404,20 +421,16 @@ function exportGroup(doc, groupLayer, exportDir, export1x, export2x) {
                 ResampleMethod.BICUBIC
             );
         }
-        var path2x = new File(exportDir.fsName + "/" + groupName + "@2x.png");
+        var path2x = new File(exportDir.fsName + "/" + outName + "@2x.png");
         exportPNG(tempDoc, path2x);
         log("  ✓ 已导出 2x: " + path2x.fsName);
     }
 
-    // ---- 9. 清理 ----
+    // ---- 9. 清理：关闭临时文档并切回原文档 ----
+    //     原文档的副本已在第 5 步移除，此处只需关闭临时文档。
     tempDoc.close(SaveOptions.DONOTSAVECHANGES);
     app.activeDocument = doc;
-    try {
-        mergedLayer.remove();
-    } catch (e) {
-        log("  ⚠ 清理临时图层失败: " + e.message);
-    }
-    log("  完成: " + groupName);
+    log("  完成: " + outName);
 }
 
 // ============================================================================
@@ -478,13 +491,37 @@ function runExport(export1x, export2x, regexStr) {
         return;
     }
 
+    // ---- 统计重名：只有出现 ≥2 次的组名才需要追加序号 ----
+    var nameTotal = {};   // 组名 -> 总出现次数
+    for (var t = 0; t < matchedGroups.length; t++) {
+        var nm = matchedGroups[t].name;
+        nameTotal[nm] = (nameTotal[nm] || 0) + 1;
+    }
+    var nameSeq = {};     // 组名 -> 已分配序号（运行时累加）
+
+    // 生成导出名：唯一名保持原样；重名则追加补零序号（去完成01、去完成02…）
+    function makeExportName(name) {
+        if (nameTotal[name] <= 1) {
+            return name;
+        }
+        nameSeq[name] = (nameSeq[name] || 0) + 1;
+        var seq = nameSeq[name];
+        // 位数按该名字总数决定：≤99 用两位，更多则自然扩展
+        var width = String(nameTotal[name]).length;
+        if (width < 2) width = 2;
+        var s = String(seq);
+        while (s.length < width) s = "0" + s;
+        return name + s;
+    }
+
     // ---- 逐个导出 ----
     log("");
     var successCount = 0;
     var errorCount   = 0;
     for (var m = 0; m < matchedGroups.length; m++) {
         try {
-            exportGroup(doc, matchedGroups[m], exportDir, export1x, export2x);
+            var outName = makeExportName(matchedGroups[m].name);
+            exportGroup(doc, matchedGroups[m], exportDir, export1x, export2x, outName);
             successCount++;
         } catch (e) {
             errorCount++;
