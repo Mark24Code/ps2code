@@ -1,29 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Empty, Spin, Tree, Typography } from 'antd'
+import { FolderOutlined, PictureOutlined } from '@ant-design/icons'
+import type { DataNode } from 'antd/es/tree'
 import type { PsdLayerNode, PsdMeta } from '@shared/types'
 
 interface Props {
   psdPath: string
 }
 
-function TreeNode({ node, depth }: { node: PsdLayerNode; depth: number }): JSX.Element {
-  const [open, setOpen] = useState(depth < 1)
+function toDataNode(node: PsdLayerNode): DataNode {
   const isGroup = node.kind === 'group'
-  return (
-    <div className="tree-node">
-      <div
-        className="tree-row"
-        style={{ paddingLeft: depth * 14 + 8 }}
-        onClick={() => isGroup && setOpen((o) => !o)}
-      >
-        <span className="tree-caret">{isGroup ? (open ? '▾' : '▸') : '·'}</span>
-        <span className={`tree-name ${node.hidden ? 'hidden' : ''}`}>{node.name}</span>
-        <span className="tree-size">
+  return {
+    key: node.id,
+    icon: isGroup ? <FolderOutlined /> : <PictureOutlined />,
+    title: (
+      <span style={{ opacity: node.hidden ? 0.45 : 1 }}>
+        <span style={{ textDecoration: node.hidden ? 'line-through' : 'none' }}>{node.name}</span>
+        <Typography.Text type="secondary" style={{ marginLeft: 8, fontSize: 11 }}>
           {node.width}×{node.height}
-        </span>
-      </div>
-      {isGroup && open && node.children?.map((c) => <TreeNode key={c.id} node={c} depth={depth + 1} />)}
-    </div>
-  )
+        </Typography.Text>
+      </span>
+    ),
+    children: node.children?.map(toDataNode)
+  }
 }
 
 export function LayerTree({ psdPath }: Props): JSX.Element {
@@ -39,17 +38,17 @@ export function LayerTree({ psdPath }: Props): JSX.Element {
       .catch((e) => setError(String(e)))
   }, [psdPath])
 
-  if (error) return <div className="empty">图层读取失败:{error}</div>
-  if (!meta) return <div className="empty">读取图层中…</div>
+  const treeData = useMemo(() => (meta ? meta.tree.map(toDataNode) : []), [meta])
+
+  if (error) return <Empty description={`图层读取失败:${error}`} />
+  if (!meta) return <Spin style={{ display: 'block', padding: 24 }} tip="读取图层中…" />
 
   return (
-    <div className="layer-tree">
-      <div className="tree-summary">
+    <div>
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
         画布 {meta.width}×{meta.height} · {meta.groupCount} 组 / {meta.layerCount} 层
-      </div>
-      {meta.tree.map((n) => (
-        <TreeNode key={n.id} node={n} depth={0} />
-      ))}
+      </Typography.Text>
+      <Tree showIcon defaultExpandedKeys={treeData.slice(0, 1).map((n) => n.key)} treeData={treeData} />
     </div>
   )
 }

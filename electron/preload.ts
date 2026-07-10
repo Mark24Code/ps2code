@@ -52,6 +52,10 @@ const api = {
   psDetect: (): Promise<{ app: string; version?: string } | null> =>
     ipcRenderer.invoke(IPC.psDetect),
   psTest: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke(IPC.psTest),
+  psOpenDesign: (
+    psdPath: string
+  ): Promise<{ ok: boolean; message: string; docName?: string }> =>
+    ipcRenderer.invoke(IPC.psOpenDesign, psdPath),
 
   // Agent
   agentSend: (payload: {

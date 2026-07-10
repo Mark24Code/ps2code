@@ -101,3 +101,22 @@ export async function testConnection(): Promise<{ ok: boolean; message: string }
     return { ok: false, message: (e as Error).message }
   }
 }
+
+// 确保 Photoshop 已启动、且目标设计稿已打开(未开则打开,已开则置为当前文档)。
+// 用于进入/切换对话时保证 PS 与设计稿就绪。
+export async function ensureDesignReady(
+  targetPath: string
+): Promise<{ ok: boolean; message: string; docName?: string }> {
+  try {
+    const res = await runScript<{ docName: string; version: string }>('open-design.jsx', {
+      targetPath
+    })
+    return {
+      ok: res.ok,
+      message: res.ok ? `已就绪:${res.data.docName}` : res.error,
+      docName: res.data?.docName
+    }
+  } catch (e) {
+    return { ok: false, message: (e as Error).message }
+  }
+}

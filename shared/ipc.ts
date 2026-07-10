@@ -34,6 +34,7 @@ export const IPC = {
   // Photoshop
   psDetect: 'ps:detect',
   psTest: 'ps:test',
+  psOpenDesign: 'ps:openDesign',
 
   // Agent
   agentSend: 'agent:send',

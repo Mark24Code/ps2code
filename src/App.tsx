@@ -1,5 +1,9 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Button, Layout, Space, Typography } from 'antd'
+import { ArrowLeftOutlined, SettingOutlined } from '@ant-design/icons'
 import { APP_NAME } from '@shared/config'
+
+const { Header, Content } = Layout
 
 export function App(): JSX.Element {
   const nav = useNavigate()
@@ -7,22 +11,44 @@ export function App(): JSX.Element {
   const onHome = loc.pathname === '/'
 
   return (
-    <div className="app">
-      <div className="topbar">
-        <span className="brand">{APP_NAME}</span>
+    <Layout style={{ height: '100%' }}>
+      <Header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '0 16px',
+          borderBottom: '1px solid var(--border)',
+          WebkitAppRegion: 'drag'
+        }}
+      >
+        <Typography.Text strong style={{ paddingLeft: 60, letterSpacing: 0.3 }}>
+          {APP_NAME}
+        </Typography.Text>
         {!onHome && (
-          <span className="crumb" onClick={() => nav('/')}>
-            ← 主界面
-          </span>
+          <Button
+            type="text"
+            size="small"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => nav('/')}
+            style={{ WebkitAppRegion: 'no-drag' }}
+          >
+            主界面
+          </Button>
         )}
-        <span className="spacer" />
-        <button className="ghost" onClick={() => nav('/settings')}>
+        <span style={{ flex: 1 }} />
+        <Button
+          type="text"
+          icon={<SettingOutlined />}
+          onClick={() => nav('/settings')}
+          style={{ WebkitAppRegion: 'no-drag' }}
+        >
           设置
-        </button>
-      </div>
-      <div className="page">
+        </Button>
+      </Header>
+      <Content style={{ overflow: 'auto', minHeight: 0 }}>
         <Outlet />
-      </div>
-    </div>
+      </Content>
+    </Layout>
   )
 }

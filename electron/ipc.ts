@@ -3,11 +3,12 @@ import { basename, dirname, join } from 'path'
 import { copyFile, mkdir, readdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { IPC } from '../shared/ipc'
+import { dedupeFileName } from '../shared/naming'
 import type { AgentStreamEvent, AppSettings, Conversation } from '../shared/types'
 import * as db from './services/db'
 import { readPsdMeta } from './services/psd'
 import { getBridge } from './services/photoshop'
-import { testConnection } from './services/photoshop/operations'
+import { ensureDesignReady, testConnection } from './services/photoshop/operations'
 import { cancelAgent, resolveConfirm, runAgent } from './services/agent'
 import { checkUpdate } from './services/updater'
 import { getMainWindow } from './main'
@@ -63,6 +64,7 @@ export function registerIpc(): void {
   // ---------- Photoshop ----------
   ipcMain.handle(IPC.psDetect, () => getBridge().detect())
   ipcMain.handle(IPC.psTest, () => testConnection())
+  ipcMain.handle(IPC.psOpenDesign, (_e, psdPath: string) => ensureDesignReady(psdPath))
 
   // ---------- Agent ----------
   ipcMain.handle(
@@ -119,18 +121,12 @@ export function registerIpc(): void {
     const files = existsSync(conv.tmpDir)
       ? (await readdir(conv.tmpDir)).filter((f) => f.toLowerCase().endsWith('.png'))
       : []
+    // 已占用名集合:目标目录现有文件 + 本次已拷入的名字
+    const taken = new Set<string>(existsSync(dest) ? await readdir(dest) : [])
     for (const f of files) {
-      let target = join(dest, f)
-      // 去重:同名追加序号
-      let i = 1
-      const dot = f.lastIndexOf('.')
-      const stem = dot >= 0 ? f.slice(0, dot) : f
-      const ext = dot >= 0 ? f.slice(dot) : ''
-      while (existsSync(target)) {
-        target = join(dest, `${stem}(${i})${ext}`)
-        i++
-      }
-      await copyFile(join(conv.tmpDir, f), target)
+      const name = dedupeFileName(f, taken)
+      taken.add(name)
+      await copyFile(join(conv.tmpDir, f), join(dest, name))
     }
     return { ok: true, dir: dest, count: files.length }
   })

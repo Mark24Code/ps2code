@@ -40,13 +40,14 @@
             nameTotal[mn] = (nameTotal[mn] || 0) + 1;
         }
         var nameSeq = {};
+        // 唯一名保持原样;重名则追加 _01 / _02(补零位数按该名总数决定)
         function makeExportName(name) {
             if (nameTotal[name] <= 1) return name;
             nameSeq[name] = (nameSeq[name] || 0) + 1;
             var width = String(nameTotal[name]).length; if (width < 2) width = 2;
             var s = String(nameSeq[name]);
             while (s.length < width) s = "0" + s;
-            return name + s;
+            return name + "_" + s;
         }
 
         function exportPNG(d, filePath) {

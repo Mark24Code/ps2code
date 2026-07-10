@@ -7,6 +7,7 @@ import type {
   Message,
   Project
 } from '../../../shared/types'
+import { createSchema } from './schema'
 
 let db: Database.Database
 
@@ -21,43 +22,13 @@ const DEFAULT_SETTINGS: AppSettings = {
 export function initDatabase(): void {
   const file = join(app.getPath('userData'), 'ps2code.db')
   db = new Database(file)
-  db.pragma('journal_mode = WAL')
+  createSchema(db)
+}
 
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS projects (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      psd_path TEXT NOT NULL UNIQUE,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS conversations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      title TEXT NOT NULL DEFAULT '新对话',
-      tmp_dir TEXT NOT NULL DEFAULT '',
-      export_dir TEXT NOT NULL DEFAULT '',
-      opt_trim INTEGER NOT NULL DEFAULT 1,
-      opt_1x INTEGER NOT NULL DEFAULT 0,
-      opt_2x INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-  `)
+// 测试用:注入自定义数据库实例(如内存库)
+export function setDatabaseForTest(instance: Database.Database): void {
+  db = instance
+  createSchema(db)
 }
 
 // ---------- 行映射 ----------
