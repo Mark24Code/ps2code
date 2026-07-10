@@ -19,6 +19,10 @@ mac:
     - dmg
   category: public.app-category.graphics-design
   artifactName: ${productName}-${version}-${arch}.${ext}
+  # 本地 ad-hoc 签名(identity "-"):无需证书/账号,产物可拷到其它 Mac。
+  # 目标机首次打开需去隔离:右键打开,或 xattr -dr com.apple.quarantine PS2Code.app
+  # (见 scripts/unquarantine.sh)。正式分发再换 Developer ID 证书 + 公证。
+  identity: '-'
 win:
   target:
     - nsis

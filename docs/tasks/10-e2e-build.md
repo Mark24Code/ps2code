@@ -23,3 +23,8 @@
 
 ## 依赖
 - Task 08、Task 09(全部功能就位)
+
+## 打包与签名注意
+- 本地验证产物:`electron-builder.yml` 里 `mac.identity: null` 关闭代码签名,并用环境变量 `CSC_IDENTITY_AUTO_DISCOVERY=false` 防止自动发现本地证书——否则会卡在签名/公证(需钥匙串授权或 Apple 账号公证)。
+- 正式分发再配置:mac 需 Developer ID 证书 + 公证(notarytool);win 需代码签名证书。
+- 命令:`npm run dist:mac` / `npm run dist:win`,产物在 `dist/`。
