@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Empty, Spin, Tree, Typography } from 'antd'
-import { FolderOutlined, PictureOutlined } from '@ant-design/icons'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Button, Empty, Spin, Tree, Typography } from 'antd'
+import { FolderOutlined, PictureOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { DataNode } from 'antd/es/tree'
 import type { PsdLayerNode, PsdMeta } from '@shared/types'
 
@@ -28,27 +28,78 @@ function toDataNode(node: PsdLayerNode): DataNode {
 export function LayerTree({ psdPath }: Props): JSX.Element {
   const [meta, setMeta] = useState<PsdMeta | null>(null)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
+  const load = useCallback((): void => {
     setError('')
-    setMeta(null)
+    setLoading(true)
     window.api
       .psdRead(psdPath)
       .then(setMeta)
       .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false))
   }, [psdPath])
+
+  useEffect(() => {
+    setMeta(null)
+    load()
+  }, [load])
+
+  // 窗口失焦后重新聚焦(用户可能在 PS 编辑过)→ 防抖后自动刷新一次最新状态
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const off = window.api.onWindowFocused(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => load(), 800)
+    })
+    return () => {
+      if (timer) clearTimeout(timer)
+      off()
+    }
+  }, [load])
 
   const treeData = useMemo(() => (meta ? meta.tree.map(toDataNode) : []), [meta])
 
-  if (error) return <Empty description={`图层读取失败:${error}`} />
-  if (!meta) return <Spin style={{ display: 'block', padding: 24 }} tip="读取图层中…" />
-
   return (
-    <div>
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-        画布 {meta.width}×{meta.height} · {meta.groupCount} 组 / {meta.layerCount} 层
-      </Typography.Text>
-      <Tree showIcon defaultExpandedKeys={treeData.slice(0, 1).map((n) => n.key)} treeData={treeData} />
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          paddingBottom: 8,
+          borderBottom: '1px solid var(--border)'
+        }}
+      >
+        <Typography.Text type="secondary" style={{ fontSize: 12, flex: 1 }}>
+          {meta
+            ? `画布 ${meta.width}×${meta.height} · ${meta.groupCount} 组 / ${meta.layerCount} 层`
+            : '图层结构'}
+        </Typography.Text>
+        <Button
+          size="small"
+          icon={<ReloadOutlined />}
+          loading={loading}
+          onClick={load}
+          title="重新读取最新设计稿状态"
+        >
+          刷新
+        </Button>
+      </div>
+
+      <div style={{ flex: 1, overflow: 'auto', minHeight: 0, paddingTop: 8 }}>
+        {error ? (
+          <Empty description={`图层读取失败:${error}`} />
+        ) : !meta ? (
+          <Spin style={{ display: 'block', padding: 24 }} />
+        ) : (
+          <Tree
+            showIcon
+            defaultExpandedKeys={treeData.slice(0, 1).map((n) => n.key)}
+            treeData={treeData}
+          />
+        )}
+      </div>
     </div>
   )
 }

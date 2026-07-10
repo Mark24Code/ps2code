@@ -72,23 +72,25 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
   return (
     <div
       style={{
-        borderLeft: '1px solid var(--border)',
         background: '#fff',
         display: 'flex',
         flexDirection: 'column',
-        minHeight: 0
+        minHeight: 0,
+        height: '100%'
       }}
     >
       <div
         style={{
-          padding: '10px 16px',
+          padding: '8px 12px',
           borderBottom: '1px solid var(--border)',
           display: 'flex',
           alignItems: 'center',
           gap: 8
         }}
       >
-        <Typography.Text strong>预览({items.length})</Typography.Text>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          {items.length} 个产物
+        </Typography.Text>
         <span style={{ flex: 1 }} />
         <Button
           size="small"

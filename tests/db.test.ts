@@ -8,9 +8,7 @@ import {
   listConversations,
   updateConversation,
   addMessage,
-  listMessages,
-  getSettings,
-  setSettings
+  listMessages
 } from '../electron/services/db'
 
 beforeEach(() => {
@@ -71,20 +69,3 @@ describe('消息', () => {
   })
 })
 
-describe('设置', () => {
-  it('默认值可读,写入后合并返回', () => {
-    expect(getSettings().apiModel).toBeTruthy()
-    const s = setSettings({ apiKey: 'sk-test', apiModel: 'claude-x' })
-    expect(s.apiKey).toBe('sk-test')
-    expect(s.apiModel).toBe('claude-x')
-  })
-
-  it('部分更新不覆盖其它键', () => {
-    setSettings({ apiKey: 'k1', apiBaseUrl: 'http://x' })
-    setSettings({ apiModel: 'm2' })
-    const s = getSettings()
-    expect(s.apiKey).toBe('k1')
-    expect(s.apiBaseUrl).toBe('http://x')
-    expect(s.apiModel).toBe('m2')
-  })
-})

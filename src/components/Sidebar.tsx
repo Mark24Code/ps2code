@@ -1,0 +1,156 @@
+import { useMemo, useState } from 'react'
+import { App, Button, Input, Typography } from 'antd'
+import {
+  DownOutlined,
+  EditOutlined,
+  FolderOutlined,
+  RightOutlined,
+  SearchOutlined,
+  SettingOutlined
+} from '@ant-design/icons'
+import type { Conversation, Project } from '@shared/types'
+import { relativeTime } from '../utils/time'
+
+export interface SidebarProps {
+  projects: Project[]
+  conversations: Record<number, Conversation[]> // projectId -> 对话
+  activeConversationId: string | null
+  view: 'conversation' | 'settings' | 'welcome'
+  onNewChat: () => void
+  onOpenSettings: () => void
+  onSelectConversation: (c: Conversation) => void
+  onExpandProject: (projectId: number) => void
+  onNewConversationInProject: (projectId: number) => void
+}
+
+export function Sidebar(props: SidebarProps): JSX.Element {
+  const {
+    projects,
+    conversations,
+    activeConversationId,
+    view,
+    onNewChat,
+    onOpenSettings,
+    onSelectConversation,
+    onExpandProject,
+    onNewConversationInProject
+  } = props
+  const { modal } = App.useApp()
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const [keyword, setKeyword] = useState('')
+  const [searching, setSearching] = useState(false)
+
+  const toggle = (projectId: number): void => {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(projectId)) next.delete(projectId)
+      else {
+        next.add(projectId)
+        onExpandProject(projectId)
+      }
+      return next
+    })
+  }
+
+  // 搜索:匹配项目名或其下对话标题
+  const kw = keyword.trim().toLowerCase()
+  const filteredProjects = useMemo(() => {
+    if (!kw) return projects
+    return projects.filter((p) => {
+      if (p.name.toLowerCase().includes(kw)) return true
+      const convs = conversations[p.id] ?? []
+      return convs.some((c) => c.title.toLowerCase().includes(kw))
+    })
+  }, [projects, conversations, kw])
+
+  return (
+    <div className="sidebar">
+      <div className="sidebar-top">
+        <button className="nav-item" onClick={onNewChat}>
+          <EditOutlined />
+          <span>新建对话</span>
+        </button>
+        <button
+          className={`nav-item ${searching ? 'active' : ''}`}
+          onClick={() => setSearching((s) => !s)}
+        >
+          <SearchOutlined />
+          <span>搜索</span>
+        </button>
+        {searching && (
+          <Input
+            size="small"
+            autoFocus
+            allowClear
+            placeholder="搜索项目 / 对话"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            style={{ margin: '4px 8px 0', width: 'calc(100% - 16px)' }}
+          />
+        )}
+      </div>
+
+      <div className="sidebar-scroll">
+        <div className="nav-section">设计稿</div>
+        {filteredProjects.length === 0 && (
+          <Typography.Text type="secondary" style={{ padding: '4px 16px', fontSize: 12 }}>
+            {kw ? '无匹配' : '暂无,点上方新建对话导入'}
+          </Typography.Text>
+        )}
+        {filteredProjects.map((p) => {
+          const open = expanded.has(p.id)
+          const convs = conversations[p.id] ?? []
+          return (
+            <div key={p.id}>
+              <div className="proj-row" onClick={() => toggle(p.id)}>
+                <span className="caret">{open ? <DownOutlined /> : <RightOutlined />}</span>
+                <FolderOutlined />
+                <span className="proj-name" title={p.psdPath}>
+                  {p.name}
+                </span>
+                <Button
+                  type="text"
+                  size="small"
+                  className="proj-add"
+                  icon={<EditOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onNewConversationInProject(p.id)
+                  }}
+                />
+              </div>
+              {open &&
+                convs.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`conv-row ${
+                      view === 'conversation' && activeConversationId === c.id ? 'active' : ''
+                    }`}
+                    onClick={() => onSelectConversation(c)}
+                  >
+                    <span className="conv-title" title={c.title}>
+                      {c.title}
+                    </span>
+                    <span className="conv-time">{relativeTime(c.updatedAt)}</span>
+                  </div>
+                ))}
+              {open && convs.length === 0 && (
+                <div className="conv-empty">暂无对话,点右侧 ✎ 新建</div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="sidebar-bottom">
+        <button
+          className={`nav-item ${view === 'settings' ? 'active' : ''}`}
+          onClick={onOpenSettings}
+        >
+          <SettingOutlined />
+          <span>设置</span>
+        </button>
+      </div>
+    </div>
+  )
+}

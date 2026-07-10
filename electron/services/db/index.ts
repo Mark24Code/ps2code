@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
+import { randomUUID } from 'crypto'
 import type {
   AppSettings,
   Conversation,
@@ -8,16 +9,9 @@ import type {
   Project
 } from '../../../shared/types'
 import { createSchema } from './schema'
+import { getConfig, saveConfig } from '../config'
 
 let db: Database.Database
-
-const DEFAULT_SETTINGS: AppSettings = {
-  psPath: '',
-  apiBaseUrl: '',
-  apiKey: '',
-  apiModel: 'claude-sonnet-4-5',
-  defaultExportDir: ''
-}
 
 export function initDatabase(): void {
   const file = join(app.getPath('userData'), 'ps2code.db')
@@ -101,14 +95,11 @@ export function createConversation(
   tmpDir: string,
   exportDir: string
 ): Conversation {
-  const info = db
-    .prepare(
-      'INSERT INTO conversations (project_id, tmp_dir, export_dir) VALUES (?, ?, ?)'
-    )
-    .run(projectId, tmpDir, exportDir)
-  return mapConversation(
-    db.prepare('SELECT * FROM conversations WHERE id = ?').get(info.lastInsertRowid)
-  )
+  const id = randomUUID()
+  db.prepare(
+    'INSERT INTO conversations (id, project_id, tmp_dir, export_dir) VALUES (?, ?, ?, ?)'
+  ).run(id, projectId, tmpDir, exportDir)
+  return mapConversation(db.prepare('SELECT * FROM conversations WHERE id = ?').get(id))
 }
 
 export function listConversations(projectId: number): Conversation[] {
@@ -118,12 +109,12 @@ export function listConversations(projectId: number): Conversation[] {
     .map(mapConversation)
 }
 
-export function getConversation(id: number): Conversation | null {
+export function getConversation(id: string): Conversation | null {
   const r = db.prepare('SELECT * FROM conversations WHERE id = ?').get(id)
   return r ? mapConversation(r) : null
 }
 
-export function updateConversation(id: number, patch: Partial<Conversation>): Conversation {
+export function updateConversation(id: string, patch: Partial<Conversation>): Conversation {
   const cur = getConversation(id)
   if (!cur) throw new Error('conversation not found')
   const next = { ...cur, ...patch }
@@ -141,7 +132,7 @@ export function updateConversation(id: number, patch: Partial<Conversation>): Co
   return getConversation(id) as Conversation
 }
 
-export function deleteConversation(id: number): void {
+export function deleteConversation(id: string): void {
   db.prepare('DELETE FROM conversations WHERE id = ?').run(id)
 }
 
@@ -153,7 +144,7 @@ export function addMessage(m: Omit<Message, 'id' | 'createdAt'>): Message {
   return mapMessage(db.prepare('SELECT * FROM messages WHERE id = ?').get(info.lastInsertRowid))
 }
 
-export function listMessages(conversationId: number): Message[] {
+export function listMessages(conversationId: string): Message[] {
   return db
     .prepare('SELECT * FROM messages WHERE conversation_id = ? ORDER BY id ASC')
     .all(conversationId)
@@ -161,22 +152,12 @@ export function listMessages(conversationId: number): Message[] {
 }
 
 // ---------- 设置 ----------
+// 设置持久化在 ~/.ps2code/config.json(见 services/config),不再入库。
+// 保留同名函数以兼容调用方。
 export function getSettings(): AppSettings {
-  const rows = db.prepare('SELECT key, value FROM settings').all() as {
-    key: string
-    value: string
-  }[]
-  const map = Object.fromEntries(rows.map((r) => [r.key, r.value]))
-  return { ...DEFAULT_SETTINGS, ...map } as AppSettings
+  return getConfig()
 }
 
 export function setSettings(patch: Partial<AppSettings>): AppSettings {
-  const stmt = db.prepare(
-    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value'
-  )
-  const tx = db.transaction((entries: [string, string][]) => {
-    for (const [k, v] of entries) stmt.run(k, v)
-  })
-  tx(Object.entries(patch).map(([k, v]) => [k, String(v ?? '')]))
-  return getSettings()
+  return saveConfig(patch)
 }

@@ -16,6 +16,7 @@ export function SettingsPage(): JSX.Element {
   const [detected, setDetected] = useState('检测中…')
   const [version, setVersion] = useState('')
   const [testing, setTesting] = useState(false)
+  const [checking, setChecking] = useState(false)
   const [update, setUpdate] = useState<{
     hasUpdate: boolean
     latest?: string
@@ -46,6 +47,18 @@ export function SettingsPage(): JSX.Element {
     res.ok ? message.success(res.message) : message.error(res.message)
   }
 
+  const checkAgent = async (): Promise<void> => {
+    setChecking(true)
+    // 用当前(未保存的)草稿配置检查
+    const res = await window.api.agentCheck({
+      apiBaseUrl: s.apiBaseUrl,
+      apiKey: s.apiKey,
+      apiModel: s.apiModel
+    })
+    setChecking(false)
+    res.ok ? message.success(res.message) : message.error(res.message)
+  }
+
   const pick = async (key: 'psPath' | 'defaultExportDir'): Promise<void> => {
     const p = await window.api.pickDir()
     if (p) set({ [key]: p } as Partial<AppSettings>)
@@ -58,9 +71,9 @@ export function SettingsPage(): JSX.Element {
 
   return (
     <div style={{ maxWidth: 680, margin: '0 auto', padding: 24 }}>
-      <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <Space orientation="vertical" size={16} style={{ width: '100%' }}>
         <Card title="Photoshop" size="small">
-          <Space direction="vertical" style={{ width: '100%' }}>
+          <Space orientation="vertical" style={{ width: '100%' }}>
             <Typography.Text type="secondary">Photoshop 路径(留空则自动探测)</Typography.Text>
             <Space.Compact style={{ width: '100%' }}>
               <Input
@@ -77,7 +90,10 @@ export function SettingsPage(): JSX.Element {
         </Card>
 
         <Card title="API(Agent)" size="small">
-          <Space direction="vertical" style={{ width: '100%' }} size={12}>
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: -4 }}>
+            默认使用 Claude。留空则回退系统环境变量:ANTHROPIC_AUTH_TOKEN、ANTHROPIC_BASE_URL、ANTHROPIC_MODEL(兼容 DeepSeek 等 Anthropic 协议端点)。
+          </Typography.Paragraph>
+          <Space orientation="vertical" style={{ width: '100%' }} size={12}>
             <div>
               <Typography.Text type="secondary">API 地址</Typography.Text>
               <Input
@@ -98,6 +114,9 @@ export function SettingsPage(): JSX.Element {
               <Typography.Text type="secondary">模型</Typography.Text>
               <Input value={s.apiModel} onChange={(e) => set({ apiModel: e.target.value })} />
             </div>
+            <Button loading={checking} onClick={checkAgent}>
+              检查连接
+            </Button>
           </Space>
         </Card>
 

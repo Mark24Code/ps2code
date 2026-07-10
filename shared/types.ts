@@ -28,7 +28,7 @@ export interface Project {
 }
 
 export interface Conversation {
-  id: number
+  id: string // uuid(对话即 session)
   projectId: number
   title: string
   tmpDir: string
@@ -44,7 +44,7 @@ export type MessageRole = 'user' | 'assistant' | 'tool' | 'system' | 'confirm'
 
 export interface Message {
   id: number
-  conversationId: number
+  conversationId: string
   role: MessageRole
   content: string
   createdAt: string

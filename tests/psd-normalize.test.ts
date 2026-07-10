@@ -3,14 +3,24 @@ import { normalizeTree, type RawLayer } from '../electron/services/psd/normalize
 
 describe('normalizeTree', () => {
   it('区分组与图层(有 children 即组)', () => {
+    // 输入按文件顺序;输出反转为 PS 面板顺序(顶层在上),故 solo 在前、g 在后
     const raw: RawLayer[] = [
       { name: 'g', children: [{ name: 'leaf' }] },
       { name: 'solo' }
     ]
     const { tree } = normalizeTree(raw)
-    expect(tree[0].kind).toBe('group')
-    expect(tree[0].children?.[0].kind).toBe('layer')
-    expect(tree[1].kind).toBe('layer')
+    expect(tree[0].name).toBe('solo')
+    expect(tree[0].kind).toBe('layer')
+    expect(tree[1].name).toBe('g')
+    expect(tree[1].kind).toBe('group')
+    expect(tree[1].children?.[0].kind).toBe('layer')
+  })
+
+  it('顺序与 PS 面板一致(反转文件存储顺序,顶层在上)', () => {
+    // ag-psd 文件顺序:底 → 顶 = [bottom, middle, top]
+    const raw: RawLayer[] = [{ name: 'bottom' }, { name: 'middle' }, { name: 'top' }]
+    const { tree } = normalizeTree(raw)
+    expect(tree.map((n) => n.name)).toEqual(['top', 'middle', 'bottom'])
   })
 
   it('计算 bounds 与宽高', () => {
@@ -29,9 +39,12 @@ describe('normalizeTree', () => {
   })
 
   it('hidden 精确映射为布尔', () => {
+    // 反转后顺序为 [v, h]
     const { tree } = normalizeTree([{ name: 'h', hidden: true }, { name: 'v' }])
-    expect(tree[0].hidden).toBe(true)
-    expect(tree[1].hidden).toBe(false)
+    const h = tree.find((n) => n.name === 'h')!
+    const v = tree.find((n) => n.name === 'v')!
+    expect(h.hidden).toBe(true)
+    expect(v.hidden).toBe(false)
   })
 
   it('统计组数与层数(递归)', () => {
@@ -43,12 +56,15 @@ describe('normalizeTree', () => {
     expect(layerCount).toBe(4) // g1, l1, g2, l2
   })
 
-  it('生成路径式稳定 id', () => {
+  it('生成路径式稳定 id(id 按展示顺序编号)', () => {
     const raw: RawLayer[] = [{ name: 'g', children: [{ name: 'a' }, { name: 'b' }] }]
     const { tree } = normalizeTree(raw)
     expect(tree[0].id).toBe('0')
+    // 反转后子节点顺序为 [b, a],id 按展示顺序 0/0、0/1
     expect(tree[0].children?.[0].id).toBe('0/0')
+    expect(tree[0].children?.[0].name).toBe('b')
     expect(tree[0].children?.[1].id).toBe('0/1')
+    expect(tree[0].children?.[1].name).toBe('a')
   })
 
   it('未命名图层给占位名', () => {

@@ -60,9 +60,9 @@ class MacBridge implements PhotoshopBridge {
 
   async runJsxFile(path: string): Promise<string> {
     const appName = await this.appName()
-    // UTF-8 读入避免中文乱码
+    // 不使用 activate:让 PS 在后台执行/打开设计稿,不抢焦点、不切换前台窗口。
+    // do javascript 无需将 PS 置前即可执行。UTF-8 读入避免中文乱码。
     const script = `tell application "${appName}"
-  activate
   do javascript (read POSIX file "${path}" as «class utf8»)
 end tell`
     const { stdout } = await execAsync(`osascript -e '${script.replace(/'/g, "'\\''")}'`, {
@@ -160,4 +160,9 @@ export function getBridge(): PhotoshopBridge {
     bridge = process.platform === 'win32' ? new WinBridge() : new MacBridge()
   }
   return bridge
+}
+
+// 测试用:注入假的 Bridge(无需真实 Photoshop 即可验证脚本拼接/解析链路)
+export function setBridgeForTest(fake: PhotoshopBridge | null): void {
+  bridge = fake
 }

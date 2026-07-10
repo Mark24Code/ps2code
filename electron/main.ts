@@ -2,15 +2,17 @@ import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { registerIpc } from './ipc'
 import { initDatabase } from './services/db'
+import { IPC } from '../shared/ipc'
 
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 960,
-    minHeight: 640,
+    width: 1200,
+    height: 800,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
     show: false,
     autoHideMenuBar: true,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
@@ -24,6 +26,18 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
+
+  // 失去焦点后再次聚焦 → 用户可能在 PS 编辑过,通知渲染进程刷新设计稿状态
+  let hadBlur = false
+  mainWindow.on('blur', () => {
+    hadBlur = true
+  })
+  mainWindow.on('focus', () => {
+    if (hadBlur) {
+      hadBlur = false
+      mainWindow?.webContents.send(IPC.windowFocused)
+    }
+  })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)

@@ -41,6 +41,8 @@ export const IPC = {
   agentConfirm: 'agent:confirm',
   agentCancel: 'agent:cancel',
   agentStream: 'agent:stream', // 主→渲染 事件
+  agentCheck: 'agent:check',
+  agentLogs: 'agent:logs',
 
   // 导出
   exportRun: 'export:run',
@@ -52,7 +54,10 @@ export const IPC = {
   pickDir: 'dialog:pickDir',
 
   // 更新
-  checkUpdate: 'update:check'
+  checkUpdate: 'update:check',
+
+  // 窗口重新聚焦(用户可能在 PS 编辑后切回,用于自动刷新)
+  windowFocused: 'app:windowFocused'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

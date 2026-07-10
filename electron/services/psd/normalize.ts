@@ -38,14 +38,23 @@ function toNode(layer: RawLayer, id: string, counters: { groups: number; layers:
   }
 
   if (isGroup && layer.children) {
-    node.children = layer.children.map((c, i) => toNode(c, `${id}/${i}`, counters))
+    // ag-psd 的 children 是文件存储顺序(底层在前),PS 面板是顶层在上,
+    // 反转以与 PS 看到的顺序一致。
+    node.children = layer.children
+      .slice()
+      .reverse()
+      .map((c, i) => toNode(c, `${id}/${i}`, counters))
   }
   return node
 }
 
 // 把 ag-psd 的 children 规范化为 PsdLayerNode 树,并统计组数/层数(纯函数,无副作用)。
+// 顶层同样反转,使整体顺序与 Photoshop 图层面板一致(顶层在上)。
 export function normalizeTree(children: RawLayer[] | undefined): NormalizeResult {
   const counters = { groups: 0, layers: 0 }
-  const tree = (children ?? []).map((c, i) => toNode(c, `${i}`, counters))
+  const tree = (children ?? [])
+    .slice()
+    .reverse()
+    .map((c, i) => toNode(c, `${i}`, counters))
   return { tree, groupCount: counters.groups, layerCount: counters.layers }
 }

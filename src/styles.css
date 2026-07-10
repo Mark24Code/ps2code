@@ -9,6 +9,9 @@
   --brand: #1f6feb;
   --brand-hover: #1a5fd0;
   --brand-soft: #e8f0fe;
+  --ok: #2e7d46;
+  --danger: #c0392b;
+  --sidebar-w: 248px;
 }
 
 * {
@@ -25,4 +28,355 @@ body,
 body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+}
+
+/* antd <App> 会包一层 .ant-app,需撑满以让下面 height:100% 生效 */
+.ant-app {
+  height: 100%;
+}
+
+/* ---------- 应用外壳:固定左栏 + 右内容 ---------- */
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  height: 100%;
+  overflow: hidden;
+}
+
+.app-content {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* ---------- 左侧导航 ---------- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  min-height: 0;
+}
+
+/* 顶部留出 macOS 红绿灯空间 + 可拖拽 */
+.sidebar-top {
+  padding: 8px 8px 4px;
+  padding-top: 36px;
+  -webkit-app-region: drag;
+}
+.sidebar-top .nav-item,
+.sidebar-top .ant-input-affix-wrapper {
+  -webkit-app-region: no-drag;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+.nav-item:hover {
+  background: var(--surface-2);
+}
+.nav-item.active {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.nav-item .anticon {
+  font-size: 15px;
+}
+
+.sidebar-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+  min-height: 0;
+}
+
+.nav-section {
+  padding: 12px 12px 4px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.proj-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text);
+}
+.proj-row:hover {
+  background: var(--surface-2);
+}
+.proj-row .caret {
+  font-size: 10px;
+  color: var(--text-3);
+  width: 12px;
+}
+.proj-row .proj-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.proj-row .proj-add {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.proj-row:hover .proj-add {
+  opacity: 1;
+}
+
+.conv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-2);
+}
+.conv-row:hover {
+  background: var(--surface-2);
+}
+.conv-row.active {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.conv-row .conv-title {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+.conv-row .conv-time {
+  font-size: 11px;
+  color: var(--text-3);
+  flex: 0 0 auto;
+}
+.conv-empty {
+  padding: 6px 10px 6px 30px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.sidebar-bottom {
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- 对话顶部工具栏 ---------- */
+.conv-toolbar {
+  height: 44px;
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  /* 整条工具栏可拖动窗口 */
+  -webkit-app-region: drag;
+}
+.conv-toolbar .title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 工具栏内的按钮/交互元素不参与拖拽 */
+.conv-toolbar button,
+.conv-toolbar a,
+.conv-toolbar input,
+.conv-toolbar .ant-btn {
+  -webkit-app-region: no-drag;
+}
+
+/* ---------- Composer ---------- */
+.composer {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 12px 16px;
+}
+.composer-design {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.composer-design .design-pin {
+  font-weight: 500;
+}
+.composer-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.composer-opts .opt-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.composer-opts .opt-label {
+  width: 64px;
+  flex: 0 0 64px;
+  font-size: 12px;
+}
+/* 底部右下角:设计稿别针 + 状态图标 */
+.composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.composer-footer .design-pin {
+  font-weight: 500;
+}
+
+/* 请求日志面板 */
+.log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.log-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--text-3);
+}
+.log-item.log-request {
+  border-left-color: var(--brand);
+}
+.log-item.log-response {
+  border-left-color: var(--ok);
+}
+.log-item.log-tool {
+  border-left-color: #b8860b;
+}
+.log-item.log-error {
+  border-left-color: var(--danger);
+}
+.log-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.log-level {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.log-ts {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.log-msg {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text);
+}
+
+/* ---------- 右侧 Tabs 撑满 ---------- */
+.right-tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.right-tabs .ant-tabs-nav {
+  margin: 0;
+  padding: 0 12px;
+}
+.right-tabs .ant-tabs-content-holder {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.right-tabs .ant-tabs-content {
+  height: 100%;
+}
+.right-tabs .ant-tabs-tabpane {
+  height: 100%;
+}
+
+/* ---------- 思考中气泡(Codex 风格) ---------- */
+.thinking-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.thinking-text {
+  color: var(--text-3);
+  font-size: 13px;
+}
+.thinking-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.thinking-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-3);
+  animation: thinking-bounce 1.2s infinite ease-in-out both;
+}
+.thinking-dots span:nth-child(1) {
+  animation-delay: -0.24s;
+}
+.thinking-dots span:nth-child(2) {
+  animation-delay: -0.12s;
+}
+@keyframes thinking-bounce {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ---------- 欢迎页 ---------- */
+.welcome {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
 }

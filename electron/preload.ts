@@ -29,13 +29,13 @@ const api = {
     ipcRenderer.invoke(IPC.convList, projectId),
   convCreate: (projectId: number): Promise<Conversation> =>
     ipcRenderer.invoke(IPC.convCreate, projectId),
-  convGet: (id: number): Promise<Conversation | null> => ipcRenderer.invoke(IPC.convGet, id),
-  convUpdate: (id: number, patch: Partial<Conversation>): Promise<Conversation> =>
+  convGet: (id: string): Promise<Conversation | null> => ipcRenderer.invoke(IPC.convGet, id),
+  convUpdate: (id: string, patch: Partial<Conversation>): Promise<Conversation> =>
     ipcRenderer.invoke(IPC.convUpdate, id, patch),
-  convDelete: (id: number): Promise<void> => ipcRenderer.invoke(IPC.convDelete, id),
+  convDelete: (id: string): Promise<void> => ipcRenderer.invoke(IPC.convDelete, id),
 
   // 消息
-  msgList: (conversationId: number): Promise<Message[]> =>
+  msgList: (conversationId: string): Promise<Message[]> =>
     ipcRenderer.invoke(IPC.msgList, conversationId),
   msgAdd: (m: Omit<Message, 'id' | 'createdAt'>): Promise<Message> =>
     ipcRenderer.invoke(IPC.msgAdd, m),
@@ -59,13 +59,22 @@ const api = {
 
   // Agent
   agentSend: (payload: {
-    conversationId: number
+    conversationId: string
     text: string
   }): Promise<void> => ipcRenderer.invoke(IPC.agentSend, payload),
   agentConfirm: (id: string, approved: boolean): Promise<void> =>
     ipcRenderer.invoke(IPC.agentConfirm, id, approved),
-  agentCancel: (conversationId: number): Promise<void> =>
+  agentCancel: (conversationId: string): Promise<void> =>
     ipcRenderer.invoke(IPC.agentCancel, conversationId),
+  agentCheck: (draft?: {
+    apiBaseUrl?: string
+    apiKey?: string
+    apiModel?: string
+  }): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke(IPC.agentCheck, draft),
+  agentLogs: (
+    conversationId: string
+  ): Promise<{ ts: number; level: string; message: string }[]> =>
+    ipcRenderer.invoke(IPC.agentLogs, conversationId),
   onAgentStream: (cb: (event: unknown) => void): (() => void) => {
     const listener = (_e: unknown, data: unknown): void => cb(data)
     ipcRenderer.on(IPC.agentStream, listener)
@@ -73,14 +82,21 @@ const api = {
   },
 
   // 导出
-  exportConfirm: (conversationId: number): Promise<{ ok: boolean; dir: string; count: number }> =>
+  exportConfirm: (conversationId: string): Promise<{ ok: boolean; dir: string; count: number }> =>
     ipcRenderer.invoke(IPC.exportConfirm, conversationId),
-  previewList: (conversationId: number): Promise<{ name: string; dataUrl: string }[]> =>
+  previewList: (conversationId: string): Promise<{ name: string; dataUrl: string }[]> =>
     ipcRenderer.invoke(IPC.previewList, conversationId),
 
   // 文件选择
   pickPsd: (): Promise<string | null> => ipcRenderer.invoke(IPC.pickPsd),
   pickDir: (): Promise<string | null> => ipcRenderer.invoke(IPC.pickDir),
+
+  // 窗口重新聚焦事件(用户可能在 PS 编辑后切回)
+  onWindowFocused: (cb: () => void): (() => void) => {
+    const listener = (): void => cb()
+    ipcRenderer.on(IPC.windowFocused, listener)
+    return () => ipcRenderer.removeListener(IPC.windowFocused, listener)
+  },
 
   // 更新
   checkUpdate: (): Promise<{

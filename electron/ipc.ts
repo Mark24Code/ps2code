@@ -9,11 +9,12 @@ import * as db from './services/db'
 import { readPsdMeta } from './services/psd'
 import { getBridge } from './services/photoshop'
 import { ensureDesignReady, testConnection } from './services/photoshop/operations'
-import { cancelAgent, resolveConfirm, runAgent } from './services/agent'
+import { cancelAgent, checkAgentConfig, resolveConfirm, runAgent } from './services/agent'
+import { getLogs } from './services/agent/logStore'
 import { checkUpdate } from './services/updater'
 import { getMainWindow } from './main'
 
-function convTmpDir(conversationId: number): string {
+function convTmpDir(conversationId: string): string {
   return join(app.getPath('temp'), 'ps2code', String(conversationId))
 }
 
@@ -44,14 +45,14 @@ export function registerIpc(): void {
     await mkdir(tmp, { recursive: true })
     return db.updateConversation(conv.id, { tmpDir: tmp } as Partial<Conversation>)
   })
-  ipcMain.handle(IPC.convGet, (_e, id: number) => db.getConversation(id))
-  ipcMain.handle(IPC.convUpdate, (_e, id: number, patch: Partial<Conversation>) =>
+  ipcMain.handle(IPC.convGet, (_e, id: string) => db.getConversation(id))
+  ipcMain.handle(IPC.convUpdate, (_e, id: string, patch: Partial<Conversation>) =>
     db.updateConversation(id, patch)
   )
-  ipcMain.handle(IPC.convDelete, (_e, id: number) => db.deleteConversation(id))
+  ipcMain.handle(IPC.convDelete, (_e, id: string) => db.deleteConversation(id))
 
   // ---------- 消息 ----------
-  ipcMain.handle(IPC.msgList, (_e, conversationId: number) => db.listMessages(conversationId))
+  ipcMain.handle(IPC.msgList, (_e, conversationId: string) => db.listMessages(conversationId))
   ipcMain.handle(IPC.msgAdd, (_e, m) => db.addMessage(m))
 
   // ---------- 设置 ----------
@@ -69,7 +70,7 @@ export function registerIpc(): void {
   // ---------- Agent ----------
   ipcMain.handle(
     IPC.agentSend,
-    async (_e, payload: { conversationId: number; text: string }) => {
+    async (_e, payload: { conversationId: string; text: string }) => {
       db.addMessage({ conversationId: payload.conversationId, role: 'user', content: payload.text })
       // 首条用户消息 → 自动生成对话标题
       const conv = db.getConversation(payload.conversationId)
@@ -110,10 +111,16 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.agentConfirm, (_e, id: string, approved: boolean) =>
     resolveConfirm(id, approved)
   )
-  ipcMain.handle(IPC.agentCancel, (_e, conversationId: number) => cancelAgent(conversationId))
+  ipcMain.handle(IPC.agentCancel, (_e, conversationId: string) => cancelAgent(conversationId))
+  ipcMain.handle(
+    IPC.agentCheck,
+    (_e, draft?: { apiBaseUrl?: string; apiKey?: string; apiModel?: string }) =>
+      checkAgentConfig(draft)
+  )
+  ipcMain.handle(IPC.agentLogs, (_e, conversationId: string) => getLogs(conversationId))
 
   // ---------- 导出确认: tmp → exportDir ----------
-  ipcMain.handle(IPC.exportConfirm, async (_e, conversationId: number) => {
+  ipcMain.handle(IPC.exportConfirm, async (_e, conversationId: string) => {
     const conv = db.getConversation(conversationId)
     if (!conv) throw new Error('对话不存在')
     const dest = conv.exportDir
@@ -132,7 +139,7 @@ export function registerIpc(): void {
   })
 
   // ---------- 预览: 列出对话 tmp 下的 PNG,返回 dataURL ----------
-  ipcMain.handle(IPC.previewList, async (_e, conversationId: number) => {
+  ipcMain.handle(IPC.previewList, async (_e, conversationId: string) => {
     const conv = db.getConversation(conversationId)
     if (!conv || !existsSync(conv.tmpDir)) return []
     const files = (await readdir(conv.tmpDir)).filter((f) => f.toLowerCase().endsWith('.png'))
