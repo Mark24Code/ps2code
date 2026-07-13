@@ -2,7 +2,7 @@ import { app, dialog, ipcMain, shell } from 'electron'
 import { basename, dirname, extname, join } from 'path'
 import { copyFile, mkdir, readdir, readFile } from 'fs/promises'
 import { existsSync } from 'fs'
-import { readFile, unlink, writeFile } from 'fs/promises'
+import { unlink, writeFile } from 'fs/promises'
 import { IPC } from '../shared/ipc'
 import { dedupeFileName } from '../shared/naming'
 import type { AgentStreamEvent, AppSettings, Conversation } from '../shared/types'
@@ -209,7 +209,8 @@ export function registerIpc(): void {
     const metaPath = join(conv.tmpDir, '_meta.json')
     if (existsSync(metaPath)) {
       try {
-        const raw = await readFile(metaPath, 'utf8')
+        const { readFile: readMetaFile } = await import('fs/promises')
+        const raw = await readMetaFile(metaPath, 'utf8')
         const arr = JSON.parse(raw) as { file: string; w: number; h: number; x: number; y: number }[]
         const nameSet = new Set(names)
         const pruned = arr.filter((m) => !nameSet.has(m.file))
