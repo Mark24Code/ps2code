@@ -143,7 +143,7 @@ export function ConversationView({ conversationId, onConversationUpdated }: Prop
   const gateDisabled = ready.state !== 'ok'
 
   return (
-    <Layout style={{ height: '100%' }}>
+    <Layout style={{ height: '100%', overflow: 'hidden' }}>
       <Content style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div className="conv-toolbar">
           <Typography.Text className="title" title={conv.title}>
@@ -249,7 +249,7 @@ export function ConversationView({ conversationId, onConversationUpdated }: Prop
         />
       </Content>
 
-      <Sider width={360} theme="light" style={{ height: '100%' }}>
+      <Sider width={360} theme="light" style={{ height: '100%', overflow: 'hidden' }}>
         <Tabs
           className="right-tabs"
           defaultActiveKey="preview"
