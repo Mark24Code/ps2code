@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { App, Button, Input, Popover, Typography } from 'antd'
 import {
+  DeleteOutlined,
   DownOutlined,
   EditOutlined,
   EllipsisOutlined,
@@ -27,6 +28,7 @@ export interface SidebarProps {
   onNewConversationInProject: (projectId: number) => void
   onDeleteConversation: (conv: Conversation) => void
   onDeleteProject: (project: Project) => void
+  onRenameProject: (project: Project, name: string) => void
 }
 
 export function Sidebar(props: SidebarProps): JSX.Element {
@@ -42,12 +44,16 @@ export function Sidebar(props: SidebarProps): JSX.Element {
     onExpandProject,
     onNewConversationInProject,
     onDeleteConversation,
-    onDeleteProject
+    onDeleteProject,
+    onRenameProject
   } = props
   const { modal } = App.useApp()
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [keyword, setKeyword] = useState('')
   const [searching, setSearching] = useState(false)
+  const [editingProjectId, setEditingProjectId] = useState<number | null>(null)
+  const [editName, setEditName] = useState('')
+  const editInputRef = useRef<any>(null)
 
   const toggle = (projectId: number): void => {
     setExpanded((prev) => {
@@ -114,14 +120,47 @@ export function Sidebar(props: SidebarProps): JSX.Element {
               <div className="proj-row" onClick={() => toggle(p.id)}>
                 <span className="caret">{open ? <DownOutlined /> : <RightOutlined />}</span>
                 <FolderOutlined />
-                <span className="proj-name" title={p.psdPath}>
-                  {p.name}
-                </span>
+                {editingProjectId === p.id ? (
+                  <Input
+                    ref={editInputRef}
+                    size="small"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const name = editName.trim()
+                        if (name && name !== p.name) onRenameProject(p, name)
+                        setEditingProjectId(null)
+                      } else if (e.key === 'Escape') {
+                        setEditingProjectId(null)
+                      }
+                    }}
+                    onBlur={() => setEditingProjectId(null)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ flex: 1, height: 24 }}
+                  />
+                ) : (
+                  <span className="proj-name" title={p.psdPath}>
+                    {p.name}
+                  </span>
+                )}
                 <Popover
                   trigger="click"
                   placement="right"
                   content={
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <Button
+                        type="text"
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingProjectId(p.id)
+                          setEditName(p.name)
+                          setTimeout(() => editInputRef.current?.focus(), 0)
+                        }}
+                      >
+                        重命名
+                      </Button>
                       <Button
                         type="text"
                         danger

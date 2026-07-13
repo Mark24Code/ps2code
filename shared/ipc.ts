@@ -11,6 +11,7 @@ export const IPC = {
   projectImport: 'db:projects:import', // 拖入/选择 psd → 去重建项目
   projectList: 'db:projects:list',
   projectGet: 'db:projects:get',
+  projectUpdate: 'db:projects:update',
   projectDelete: 'db:projects:delete',
 
   // 对话

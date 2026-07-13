@@ -49,6 +49,7 @@ export function registerIpc(): void {
   })
   ipcMain.handle(IPC.projectList, () => db.listProjects())
   ipcMain.handle(IPC.projectGet, (_e, id: number) => db.getProject(id))
+  ipcMain.handle(IPC.projectUpdate, (_e, id: number, name: string) => db.updateProject(id, name))
   ipcMain.handle(IPC.projectDelete, (_e, id: number) => db.deleteProject(id))
 
   // ---------- 对话 ----------

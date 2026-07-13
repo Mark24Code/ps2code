@@ -85,6 +85,11 @@ export function getProject(id: number): Project | null {
   return r ? mapProject(r) : null
 }
 
+export function updateProject(id: number, name: string): Project {
+  db.prepare("UPDATE projects SET name = ?, updated_at = datetime('now') WHERE id = ?").run(name, id)
+  return getProject(id) as Project
+}
+
 export function deleteProject(id: number): void {
   db.prepare('DELETE FROM projects WHERE id = ?').run(id)
 }

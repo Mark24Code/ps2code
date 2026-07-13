@@ -22,6 +22,8 @@ const api = {
     ipcRenderer.invoke(IPC.projectImport, psdPath),
   projectList: (): Promise<Project[]> => ipcRenderer.invoke(IPC.projectList),
   projectGet: (id: number): Promise<Project | null> => ipcRenderer.invoke(IPC.projectGet, id),
+  projectUpdate: (id: number, name: string): Promise<Project> =>
+    ipcRenderer.invoke(IPC.projectUpdate, id, name),
   projectDelete: (id: number): Promise<void> => ipcRenderer.invoke(IPC.projectDelete, id),
 
   // 对话
