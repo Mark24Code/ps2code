@@ -86,7 +86,7 @@ export function createToolHandlers(deps: ToolDeps) {
       // 把日志细节也注入到返回数据中,方便 Agent 定位失败原因
       return {
         content: [{ type: 'text', text: JSON.stringify({ ...res.data, _log: res.log }) }],
-        isError: !res.ok || (res.data.ok === 0 && res.data.err > 0)
+        isError: !res.ok || res.data.err > 0
       }
     }
   }

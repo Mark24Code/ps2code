@@ -57,15 +57,51 @@
             executeAction(stringIDToTypeID("newPlacedLayer"), undefined, DialogModes.NO);
         }
 
-        // ---- 导出 PNG-24 ----
-        function exportPNG(d, filePath) {
-            var opts = new ExportOptionsSaveForWeb();
-            opts.format = SaveDocumentType.PNG;
-            opts.PNG8 = false;
-            opts.transparency = true;
-            opts.interlaced = false;
-            opts.quality = 100;
-            d.exportDocument(filePath, ExportType.SAVEFORWEB, opts);
+        // ---- 多格式导出(优先 PNG,回退 TIFF→PSD) ----
+        // 主方案:与 backup/jsx/psd-group-exporter.jsx 完全一致的 SAVEFORWEB 方式(已验证可用)。
+        // 回退方案:TiffSaveOptions + saveAs / PhotoshopSaveOptions + saveAs。
+        // 注意:不设 byteOrder/Extension 等枚举,以免旧版 PS 报"无效枚举值"。
+        function exportLayerToFile(d, basePath) {
+            // 方法1:PNG via SAVEFORWEB (与 backup 完全一致,已验证兼容)
+            try {
+                var pngFile = new File(basePath + ".png");
+                var opts = new ExportOptionsSaveForWeb();
+                opts.format       = SaveDocumentType.PNG;
+                opts.PNG8         = false;
+                opts.transparency = true;
+                opts.interlaced   = false;
+                opts.quality      = 100;
+                d.exportDocument(pngFile, ExportType.SAVEFORWEB, opts);
+                PS2._push("  ✓ 1x PNG: " + pngFile.fsName);
+                return pngFile;
+            } catch (e) {
+                PS2._push("  PNG(SAVEFORWEB)不兼容(" + e.message + "),尝试 TIFF…");
+            }
+
+            // 方法2:TIFF (中转格式)
+            try {
+                var tifFile = new File(basePath + ".tif");
+                var tifOpt = new TiffSaveOptions();
+                tifOpt.transparency = true;
+                tifOpt.layers = false;
+                d.saveAs(tifFile, tifOpt, true);
+                PS2._push("  ✓ 1x TIFF: " + tifFile.fsName);
+                return tifFile;
+            } catch (e) {
+                PS2._push("  TIFF 也不兼容(" + e.message + "),尝试 PSD…");
+            }
+
+            // 方法3:PSD (万能保底)
+            try {
+                var psdFile = new File(basePath + ".psd");
+                var psdOpt = new PhotoshopSaveOptions();
+                psdOpt.layers = false;
+                d.saveAs(psdFile, psdOpt, true);
+                PS2._push("  ✓ 1x PSD: " + psdFile.fsName);
+                return psdFile;
+            } catch (e) {
+                throw new Error("所有导出方法均失败: " + e.message);
+            }
         }
 
         // ---- 导出单个图层组(移植自 backup exportGroup) ----
@@ -77,7 +113,9 @@
         //  5. 将智能对象 duplicate 到临时文档
         //  6. 删除原始文档里的副本,还原原始文档
         //  7. 裁剪透明边 → 导出 1x/2x → 关闭临时文档
+        // 返回:导出成功的文件路径数组
         function exportOneGroup(groupLayer, outName) {
+            var savedFiles = [];
             PS2._push("--- 处理: " + groupLayer.name + (outName !== groupLayer.name ? " → " + outName : ""));
 
             // 1. 复制组副本
@@ -138,11 +176,10 @@
                 }
             }
 
-            // 7b. 导出 1x
+            // 7b. 导出 1x(多格式回退:PNG→TIFF→PSD)
             if (p.x1) {
-                var path1x = new File(exportDir.fsName + "/" + outName + ".png");
-                exportPNG(tempDoc, path1x);
-                PS2._push("  ✓ 1x: " + path1x.fsName);
+                var f1 = exportLayerToFile(tempDoc, exportDir.fsName + "/" + outName);
+                if (f1) savedFiles.push(f1.fsName);
             }
 
             // 7c. 导出 2x
@@ -155,25 +192,31 @@
                         UnitValue(th * 2, "px"), 72, ResampleMethod.BICUBIC
                     );
                 } catch (e) {
-                    tempDoc.resizeImage(
-                        UnitValue(tw * 2, "px"),
-                        UnitValue(th * 2, "px"), 72, ResampleMethod.BICUBIC
-                    );
+                    PS2._push("  BICUBIC 2x 缩放失败(" + e.message + "),改用 BILINEAR…");
+                    try {
+                        tempDoc.resizeImage(
+                            UnitValue(tw * 2, "px"),
+                            UnitValue(th * 2, "px"), 72, ResampleMethod.BILINEAR
+                        );
+                    } catch (e2) {
+                        PS2._push("  BILINEAR 也失败,跳过 2x: " + e2.message);
+                    }
                 }
-                var path2x = new File(exportDir.fsName + "/" + outName + "@2x.png");
-                exportPNG(tempDoc, path2x);
-                PS2._push("  ✓ 2x: " + path2x.fsName);
+                var f2 = exportLayerToFile(tempDoc, exportDir.fsName + "/" + outName + "@2x");
+                if (f2) savedFiles.push(f2.fsName);
             }
 
             // 7d. 清理临时文档,切回原文档
             tempDoc.close(SaveOptions.DONOTSAVECHANGES);
             app.activeDocument = doc;
             PS2._push("  ✓ 完成: " + outName);
+            return savedFiles;
         }
 
         // 回退方案:convertToSmartObject 不兼容时,用 mergeVisibleLayers
         // (更保守的合并方式,仅作为兜底,可能丢失部分图层样式)
         function exportOneGroupFallback(groupLayer, outName) {
+            var savedFiles = [];
             PS2._push("  [回退] 使用 mergeVisibleLayers 方案");
             doc.activeLayer = groupLayer;
             var duplicated = groupLayer.duplicate();
@@ -213,21 +256,22 @@
             }
 
             if (p.x1) {
-                var path1x = new File(exportDir.fsName + "/" + outName + ".png");
-                exportPNG(tempDoc, path1x);
-                PS2._push("  ✓ 1x: " + path1x.fsName);
+                var f1 = exportLayerToFile(tempDoc, exportDir.fsName + "/" + outName);
+                if (f1) savedFiles.push(f1.fsName);
             }
             if (p.x2) {
                 var tw = Math.ceil(tempDoc.width.value), th = Math.ceil(tempDoc.height.value);
-                try { tempDoc.resizeImage(UnitValue(tw * 2, "px"), UnitValue(th * 2, "px"), 72, ResampleMethod.BICUBIC); } catch (e) {}
-                var path2x = new File(exportDir.fsName + "/" + outName + "@2x.png");
-                exportPNG(tempDoc, path2x);
-                PS2._push("  ✓ 2x: " + path2x.fsName);
+                try { tempDoc.resizeImage(UnitValue(tw * 2, "px"), UnitValue(th * 2, "px"), 72, ResampleMethod.BICUBIC); } catch (e) {
+                    PS2._push("  [回退] BICUBIC 2x 缩放失败: " + e.message);
+                }
+                var f2 = exportLayerToFile(tempDoc, exportDir.fsName + "/" + outName + "@2x");
+                if (f2) savedFiles.push(f2.fsName);
             }
 
             tempDoc.close(SaveOptions.DONOTSAVECHANGES);
             app.activeDocument = doc;
             PS2._push("  ✓ [回退] 完成: " + outName);
+            return savedFiles;
         }
 
         // ---- 逐个导出 ----
@@ -236,8 +280,13 @@
         for (var m = 0; m < matched.length; m++) {
             try {
                 var outName = makeExportName(matched[m].name);
-                exportOneGroup(matched[m], outName);
-                files.push(exportDir.fsName + "/" + outName + ".png");
+                var saved = exportOneGroup(matched[m], outName);
+                // 合并该组所有导出的文件路径(1x/2x,PNG/TIFF/PSD)
+                if (saved && saved.length > 0) {
+                    for (var fi = 0; fi < saved.length; fi++) {
+                        files.push(saved[fi]);
+                    }
+                }
                 ok++;
             } catch (e) {
                 err++;

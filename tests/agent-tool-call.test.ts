@@ -103,4 +103,97 @@ describe('Agent 对话可调用脚本', () => {
     expect(fake.lastScript).toBe('') // 拒绝后未执行任何脚本
     expect(res.content[0].text).toContain('取消')
   })
+
+  // ---- TIFF/PNG 转换相关 ----
+  it('export_groups TIFF→PNG 路径转换:files 扩展名变为 .png', async () => {
+    const project = importProject('/tmp/d.psd', 'd')
+    const conv = createConversation(project.id, '/tmp/export', '/tmp/out')
+
+    fake.reply = JSON.stringify({
+      ok: true,
+      data: { files: ['/tmp/export/组84.tif'], matched: 1, ok: 1, err: 0, outputDir: '/tmp/export' },
+      log: ['--- 处理: 组84', '已复制图层组', '已转为智能对象', '图层尺寸: 100 × 100 px'],
+      error: ''
+    })
+
+    const events: AgentStreamEvent[] = []
+    const handlers = createToolHandlers({
+      targetPath: project.psdPath,
+      conversationId: conv.id,
+      emit: (e) => events.push(e)
+    })
+
+    const res = await handlers.exportGroups({ names: ['组84'] })
+    expect(res.isError).toBeFalsy()
+    const data = JSON.parse(res.content[0].text)
+    // 转换失败时回退到扩展名替换,files 应是 .png 路径
+    expect(data.files[0]).toMatch(/组84\.png$/)
+  })
+
+  it('export_groups 工具回传详细日志供 Agent 排查', async () => {
+    const project = importProject('/tmp/e.psd', 'e')
+    const conv = createConversation(project.id, '/tmp/logtest', '/tmp/out')
+
+    fake.reply = JSON.stringify({
+      ok: false,
+      data: { files: [], matched: 1, ok: 0, err: 1, outputDir: '/tmp/logtest' },
+      log: [
+        '--- 处理: 组84',
+        '已复制图层组',
+        'convertToSmartObject 失败: General Photoshop error → 尝试回退方案',
+        '  [回退] mergeVisibleLayers 失败: some error (line 200)',
+        '✕ 失败 [组84]: some error'
+      ],
+      error: '导出失败: some error'
+    })
+
+    const handlers = createToolHandlers({
+      targetPath: project.psdPath,
+      conversationId: conv.id,
+      emit: () => {}
+    })
+
+    const res = await handlers.exportGroups({ names: ['组84'] })
+    // 全失败 → isError = true
+    expect(res.isError).toBe(true)
+    // 日志应被注入到返回数据中
+    const data = JSON.parse(res.content[0].text)
+    expect(data._log).toBeDefined()
+    expect(Array.isArray(data._log)).toBe(true)
+    expect(data._log.length).toBeGreaterThan(0)
+    // 日志含错误详情
+    expect(data._log.some((l: string) => l.includes('失败') || l.includes('Error'))).toBe(true)
+  })
+
+  it('export_groups 部分成功部分失败:综合工具返回', async () => {
+    const project = importProject('/tmp/f.psd', 'f')
+    const conv = createConversation(project.id, '/tmp/partial', '/tmp/out')
+
+    fake.reply = JSON.stringify({
+      ok: true,
+      data: { files: ['/tmp/partial/ok组.tif'], matched: 3, ok: 1, err: 2, outputDir: '/tmp/partial' },
+      log: [
+        '--- 处理: ok组',
+        '已复制图层组',
+        '✓ 完成: ok组',
+        '✕ 失败 [bad组1]: error1',
+        '✕ 失败 [bad组2]: error2'
+      ],
+      error: ''
+    })
+
+    const handlers = createToolHandlers({
+      targetPath: project.psdPath,
+      conversationId: conv.id,
+      emit: () => {}
+    })
+
+    const res = await handlers.exportGroups({ names: ['ok组', 'bad组1', 'bad组2'] })
+    // 部分失败 → 仍有 error 标记
+    expect(res.isError).toBe(true)
+    const data = JSON.parse(res.content[0].text)
+    expect(data.ok).toBe(1)
+    expect(data.err).toBe(2)
+    expect(data.files.length).toBe(1)
+  })
 })

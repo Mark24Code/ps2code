@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { registerIpc } from './ipc'
 import { initDatabase } from './services/db'
+import { detectAndPersistPsPath } from './services/photoshop'
 import { IPC } from '../shared/ipc'
 
 let mainWindow: BrowserWindow | null = null
@@ -56,6 +57,11 @@ function createWindow(): void {
 app.whenReady().then(() => {
   initDatabase()
   registerIpc()
+  // 初始化时检测并持久化 Photoshop 路径(不覆盖用户已配置的 psPath)。
+  // 后台执行,失败不阻断启动。
+  detectAndPersistPsPath().catch(() => {
+    /* 检测失败:用户可在设置页手填路径 */
+  })
   createWindow()
 
   app.on('activate', () => {

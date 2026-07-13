@@ -80,4 +80,98 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     expect(res.ok).toBe(false)
     expect(res.error).toContain('无法解析脚本返回')
   })
+
+  // ---- 多格式回退导出路径相关测试 ----
+  it('export_groups 主路径: exportLayerToFile 包含在组装脚本中', async () => {
+    fake.reply = JSON.stringify({
+      ok: true,
+      data: { files: ['/out/组84.png'], matched: 1, ok: 1, err: 0, outputDir: '/out' },
+      log: [],
+      error: ''
+    })
+    const res = await exportGroups({
+      targetPath: '/tmp/a.psd',
+      names: ['组84'],
+      x1: true, x2: false, trim: true, outputDir: '/out'
+    })
+    expect(res.ok).toBe(true)
+    expect(fake.lastScript).toContain('exportLayerToFile')
+    // 主方案使用 SAVEFORWEB (与已验证的 backup 一致)
+    expect(fake.lastScript).toContain('ExportOptionsSaveForWeb')
+    expect(fake.lastScript).toContain('SAVEFORWEB')
+    // 路径应为 .png(主方案已直接输出 PNG)
+    expect(res.data.files[0]).toMatch(/\.png$/)
+  })
+
+  it('export_groups 路径:返回的实际路径保留原扩展名', async () => {
+    fake.reply = JSON.stringify({
+      ok: true,
+      data: { files: ['/out/first.png', '/out/second.png'], matched: 2, ok: 2, err: 0, outputDir: '/out' },
+      log: [],
+      error: ''
+    })
+    const res = await exportGroups({
+      targetPath: '/tmp/a.psd',
+      names: ['first', 'second'],
+      x1: true, x2: false, trim: false, outputDir: '/out'
+    })
+    expect(res.data.files.length).toBe(2)
+    // 已经是 PNG 则无需转换
+    expect(res.data.files[0]).toBe('/out/first.png')
+    expect(res.data.files[1]).toBe('/out/second.png')
+  })
+
+  it('export_groups 回退路径:fallback 也使用 exportLayerToFile 多格式回退', async () => {
+    fake.reply = JSON.stringify({
+      ok: true,
+      data: { files: ['/out/组84.png'], matched: 1, ok: 1, err: 0, outputDir: '/out' },
+      log: [],
+      error: ''
+    })
+    await exportGroups({
+      targetPath: '/tmp/a.psd',
+      names: ['组84'],
+      x1: true, x2: false, trim: true, outputDir: '/out'
+    })
+    // 回退函数 exportOneGroupFallback 也应使用 exportLayerToFile
+    expect(fake.lastScript).toContain('exportLayerToFile')
+    // exportOneGroupFallback 内应包含 exportLayerToFile 调用
+    expect(fake.lastScript).toContain('exportLayerToFile(tempDoc, exportDir.fsName + "/" + outName)')
+    expect(fake.lastScript).toContain('exportLayerToFile(tempDoc, exportDir.fsName + "/" + outName + "@2x")')
+    // 不应包含旧的硬编码 exportPNG 函数名
+    expect(fake.lastScript).not.toContain('exportAsTIFF')
+  })
+
+  it('export_groups 2x:只导出 2x 时路径正确', async () => {
+    fake.reply = JSON.stringify({
+      ok: true,
+      data: { files: ['/out/组84@2x.png'], matched: 1, ok: 1, err: 0, outputDir: '/out' },
+      log: [],
+      error: ''
+    })
+    const res = await exportGroups({
+      targetPath: '/tmp/a.psd',
+      names: ['组84'],
+      x1: false, x2: true, trim: false, outputDir: '/out'
+    })
+    expect(res.ok).toBe(true)
+    expect(res.data.files[0]).toMatch(/@2x\.png$/)
+  })
+
+  it('export_groups 导出失败:err>0 时 data.files 仍返回', async () => {
+    fake.reply = JSON.stringify({
+      ok: true,
+      data: { files: ['/out/ok1.png'], matched: 3, ok: 1, err: 2, outputDir: '/out' },
+      log: ['部分失败'],
+      error: ''
+    })
+    const res = await exportGroups({
+      targetPath: '/tmp/a.psd',
+      names: ['ok1', 'bad1', 'bad2'],
+      x1: true, x2: false, trim: false, outputDir: '/out'
+    })
+    expect(res.ok).toBe(true)
+    expect(res.data.err).toBe(2)
+    expect(res.data.files.length).toBe(1)
+  })
 })

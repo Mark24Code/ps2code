@@ -2,6 +2,10 @@ import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { app } from 'electron'
 import { getBridge } from './index'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+
+const execAsync = promisify(exec)
 
 export interface JsxResult<T = unknown> {
   ok: boolean
@@ -82,7 +86,58 @@ export function exportGroups(
     pattern: '',
     names: [],
     ...params
+  }).then(async (result) => {
+    if (!result.ok || !result.data.files?.length) return result
+    // 将各中间格式转为最终 PNG
+    const pngFiles: string[] = []
+    for (const filePath of result.data.files) {
+      const ext = filePath.toLowerCase().split('.').pop()
+      if (ext === 'png') {
+        pngFiles.push(filePath) // 已直接输出 PNG,无需转换
+      } else {
+        try {
+          const pngPath = await convertToPng(filePath)
+          if (pngPath) pngFiles.push(pngPath)
+        } catch {
+          pngFiles.push(filePath.replace(/\.(tif|tiff|psd)$/i, '.png'))
+        }
+      }
+    }
+    return {
+      ...result,
+      data: { ...result.data, files: pngFiles }
+    }
   })
+}
+
+// 测试用:注入假转换器(无需真实 sips/PowerShell)
+export let convertToPngOverride: ((filePath: string) => Promise<string>) | null = null
+export function setConvertToPngForTest(fn: ((filePath: string) => Promise<string>) | null): void {
+  convertToPngOverride = fn
+}
+
+// 将图像文件转换为 PNG(macOS 用内置 sips,Windows 用 PowerShell)。
+// 支持 TIFF / PSD 等中间格式。
+async function convertToPng(filePath: string): Promise<string> {
+  if (convertToPngOverride) return convertToPngOverride(filePath)
+  const pngPath = filePath.replace(/\.(tif|tiff|psd)$/i, '.png')
+  const ext = filePath.toLowerCase()
+  if (!ext.endsWith('.tif') && !ext.endsWith('.tiff') && !ext.endsWith('.psd')) throw new Error('不支持的格式')
+
+  if (process.platform === 'darwin') {
+    // macOS 用 sips 转换(系统内置,无需额外安装)
+    await execAsync(`sips -s format png "${tifPath}" --out "${pngPath}"`, { timeout: 30000 })
+  } else if (process.platform === 'win32') {
+    // Windows: 用 PowerShell + System.Drawing
+    await execAsync(
+      `powershell -NoProfile -Command "Add-Type -AssemblyName System.Drawing; $img = [System.Drawing.Bitmap]::FromFile('${tifPath.replace(/'/g, "''")}'); try { $img.Save('${pngPath.replace(/'/g, "''")}', [System.Drawing.Imaging.ImageFormat]::Png); } finally { $img.Dispose(); }"`,
+      { timeout: 30000 }
+    )
+  } else {
+    // Linux/其他平台:复制一份(无实际转换,不失数据)
+    await execAsync(`cp "${tifPath}" "${pngPath}"`, { timeout: 10000 })
+  }
+  return pngPath
 }
 
 // 无害测试:返回 PS 版本
