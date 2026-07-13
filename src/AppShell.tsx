@@ -184,8 +184,16 @@ export function AppShell(): JSX.Element {
       <div className="app-content">
         {view === 'welcome' && <WelcomeView onNewChat={onNewChat} onDropPsd={importAndStart} />}
         {view === 'settings' && (
-          <div style={{ height: '100%', overflow: 'auto' }}>
-            <SettingsPage />
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div
+              className="conv-toolbar"
+              style={{ borderBottom: '1px solid var(--border)' }}
+            >
+              <span className="title">设置</span>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              <SettingsPage />
+            </div>
           </div>
         )}
         {view === 'conversation' && activeConvId != null && (
