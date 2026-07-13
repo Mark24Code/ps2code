@@ -25,7 +25,15 @@ export function sessionDir(conversationId: string): string {
 }
 
 function logFile(conversationId: string): string {
-  return join(sessionDir(conversationId), 'logs.jsonl')
+  const logsDir = join(sessionDir(conversationId), 'logs')
+  if (!existsSync(logsDir)) mkdirSync(logsDir, { recursive: true })
+  return join(logsDir, 'agent.log')
+}
+
+export function logPath(conversationId: string): string {
+  const logsDir = join(sessionDir(conversationId), 'logs')
+  if (!existsSync(logsDir)) mkdirSync(logsDir, { recursive: true })
+  return logsDir
 }
 
 export function addLog(

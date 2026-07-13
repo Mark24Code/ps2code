@@ -115,10 +115,10 @@ export function AppShell(): JSX.Element {
 
   const onConvStatusChange = useCallback(
     (convId: string, patch: Partial<ConvStatus>) => {
-      setConvStatus((prev) => ({
-        ...prev,
-        [convId]: { busy: false, unread: false, ...prev[convId], ...patch }
-      }))
+      setConvStatus((prev) => {
+        const cur = prev[convId] ?? { busy: false, unread: false }
+        return { ...prev, [convId]: { ...cur, ...patch } }
+      })
     },
     []
   )

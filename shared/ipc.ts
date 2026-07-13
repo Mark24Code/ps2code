@@ -44,11 +44,13 @@ export const IPC = {
   agentStream: 'agent:stream', // 主→渲染 事件
   agentCheck: 'agent:check',
   agentLogs: 'agent:logs',
+  agentLogsPath: 'agent:logsPath',
 
   // 导出
   exportRun: 'export:run',
   exportConfirm: 'export:confirm',
   previewList: 'export:previewList',
+  previewDelete: 'export:previewDelete',
 
   // 文件选择
   pickPsd: 'dialog:pickPsd',

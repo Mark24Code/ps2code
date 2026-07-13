@@ -2,6 +2,7 @@ import { app, dialog, ipcMain, shell } from 'electron'
 import { basename, dirname, extname, join } from 'path'
 import { copyFile, mkdir, readdir, readFile } from 'fs/promises'
 import { existsSync } from 'fs'
+import { readFile, unlink, writeFile } from 'fs/promises'
 import { IPC } from '../shared/ipc'
 import { dedupeFileName } from '../shared/naming'
 import type { AgentStreamEvent, AppSettings, Conversation } from '../shared/types'
@@ -10,7 +11,7 @@ import { readPsdMeta } from './services/psd'
 import { getBridge } from './services/photoshop'
 import { ensureDesignReady, testConnection } from './services/photoshop/operations'
 import { cancelAgent, checkAgentConfig, resolveConfirm, runAgent } from './services/agent'
-import { getLogs } from './services/agent/logStore'
+import { getLogs, logPath } from './services/agent/logStore'
 import { checkUpdate } from './services/updater'
 import { getMainWindow } from './main'
 
@@ -136,6 +137,7 @@ export function registerIpc(): void {
       checkAgentConfig(draft)
   )
   ipcMain.handle(IPC.agentLogs, (_e, conversationId: string) => getLogs(conversationId))
+  ipcMain.handle(IPC.agentLogsPath, (_e, conversationId: string) => logPath(conversationId))
 
   // ---------- 导出确认: tmp → exportDir ----------
   ipcMain.handle(IPC.exportConfirm, async (_e, conversationId: string, names?: string[]) => {
@@ -187,6 +189,35 @@ export function registerIpc(): void {
       })
     }
     return out
+  })
+
+  // ---------- 预览删除: 删 tmp 下的图片并更新 _meta.json ----------
+  ipcMain.handle(IPC.previewDelete, async (_e, conversationId: string, names: string[]) => {
+    const conv = db.getConversation(conversationId)
+    if (!conv || !existsSync(conv.tmpDir)) return { deleted: 0 }
+
+    // 删除图片文件
+    let deleted = 0
+    for (const name of names) {
+      const fp = join(conv.tmpDir, name)
+      if (existsSync(fp)) {
+        try { await unlink(fp); deleted++ } catch { /* skip locked files */ }
+      }
+    }
+
+    // 修剪 _meta.json
+    const metaPath = join(conv.tmpDir, '_meta.json')
+    if (existsSync(metaPath)) {
+      try {
+        const raw = await readFile(metaPath, 'utf8')
+        const arr = JSON.parse(raw) as { file: string; w: number; h: number; x: number; y: number }[]
+        const nameSet = new Set(names)
+        const pruned = arr.filter((m) => !nameSet.has(m.file))
+        await writeFile(metaPath, JSON.stringify(pruned, null, 2), 'utf8')
+      } catch { /* ignore */ }
+    }
+
+    return { deleted }
   })
 
   // ---------- 文件选择 ----------

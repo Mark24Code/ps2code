@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, Drawer, Empty, Layout, Space, Spin, Tabs, Tooltip, Typography } from 'antd'
-import { ProfileOutlined } from '@ant-design/icons'
+import { FolderOpenOutlined, ProfileOutlined } from '@ant-design/icons'
 import type { AgentStreamEvent, Conversation, Message, Project } from '@shared/types'
 import { Composer } from '../components/Composer'
 import { PreviewPane } from '../components/PreviewPane'
@@ -171,12 +171,24 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
           open={logOpen}
           onClose={() => setLogOpen(false)}
           extra={
-            <Button
-              size="small"
-              onClick={() => window.api.agentLogs(conversationId).then(setLogs)}
-            >
-              刷新
-            </Button>
+            <Space>
+              <Button
+                size="small"
+                icon={<FolderOpenOutlined />}
+                onClick={async () => {
+                  const path = await window.api.agentLogsPath(conversationId)
+                  window.api.openPath(path)
+                }}
+              >
+                打开日志目录
+              </Button>
+              <Button
+                size="small"
+                onClick={() => window.api.agentLogs(conversationId).then(setLogs)}
+              >
+                刷新
+              </Button>
+            </Space>
           }
         >
           {logs.length === 0 ? (

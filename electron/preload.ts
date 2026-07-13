@@ -77,6 +77,8 @@ const api = {
     conversationId: string
   ): Promise<{ ts: number; level: string; message: string }[]> =>
     ipcRenderer.invoke(IPC.agentLogs, conversationId),
+  agentLogsPath: (conversationId: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.agentLogsPath, conversationId),
   onAgentStream: (cb: (event: unknown) => void): (() => void) => {
     const listener = (_e: unknown, data: unknown): void => cb(data)
     ipcRenderer.on(IPC.agentStream, listener)
@@ -89,6 +91,8 @@ const api = {
   previewList: (conversationId: string): Promise<
       { name: string; dataUrl: string; w?: number; h?: number; x?: number; y?: number }[]
     > => ipcRenderer.invoke(IPC.previewList, conversationId),
+  previewDelete: (conversationId: string, names: string[]): Promise<{ deleted: number }> =>
+    ipcRenderer.invoke(IPC.previewDelete, conversationId, names),
 
   // 文件选择
   pickPsd: (): Promise<string | null> => ipcRenderer.invoke(IPC.pickPsd),

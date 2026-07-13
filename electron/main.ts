@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, nativeImage, shell } from 'electron'
 import { join } from 'path'
 import { registerIpc } from './ipc'
 import { initDatabase } from './services/db'
@@ -16,6 +16,15 @@ function getIconPath(): string {
   const devIcon = join(app.getAppPath(), 'build/icon.png')
   if (existsSync(devIcon)) return devIcon
   return ''
+}
+
+function setAppIcon(): void {
+  const iconPath = getIconPath()
+  if (!iconPath) return
+  // macOS: 用 nativeImage 设置 Dock 图标(dev 和 dist 都生效)
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(nativeImage.createFromPath(iconPath))
+  }
 }
 
 function createWindow(): void {
@@ -69,6 +78,9 @@ function createWindow(): void {
 app.whenReady().then(() => {
   initDatabase()
   registerIpc()
+  // 设置应用名称和图标
+  app.setName('PS2Code')
+  setAppIcon()
   // 初始化时检测并持久化 Photoshop 路径(不覆盖用户已配置的 psPath)。
   // 后台执行,失败不阻断启动。
   detectAndPersistPsPath().catch(() => {

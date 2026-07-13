@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { App, Button, Checkbox, Divider, Empty, Input, Progress, Typography } from 'antd'
-import { AppstoreOutlined, ExportOutlined, FolderOpenOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import { App, Button, Checkbox, Divider, Empty, Input, Modal, Progress, Typography } from 'antd'
+import { AppstoreOutlined, DeleteOutlined, ExportOutlined, FolderOpenOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import type { Conversation } from '@shared/types'
 
 interface Props {
@@ -122,6 +122,7 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
   const { message } = App.useApp()
   const [items, setItems] = useState<PreviewItem[]>([])
   const [confirming, setConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
@@ -175,6 +176,28 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
     } finally {
       setConfirming(false)
     }
+  }
+
+  const doDelete = async (): Promise<void> => {
+    Modal.confirm({
+      title: '删除预览图片',
+      content: `确定要删除选中的 ${selected.size} 张图片吗？此操作不可撤销。`,
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        setDeleting(true)
+        try {
+          const res = await window.api.previewDelete(conversation.id, Array.from(selected))
+          message.success(`已删除 ${res.deleted} 张图片`)
+          setSelected(new Set())
+          // 强制刷新预览列表
+          setItems((prev) => prev.filter((it) => !selected.has(it.name)))
+        } finally {
+          setDeleting(false)
+        }
+      }
+    })
   }
 
   const selectAll = selected.size > 0 && selected.size === filtered.length
@@ -238,15 +261,26 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
         />
         <span style={{ flex: 1 }} />
         {selected.size > 0 && (
-          <Button
-            type="primary"
-            size="small"
-            icon={<ExportOutlined />}
-            loading={confirming}
-            onClick={() => doExport(Array.from(selected))}
-          >
-            导出选中({selected.size})
-          </Button>
+          <>
+            <Button
+              type="primary"
+              size="small"
+              icon={<ExportOutlined />}
+              loading={confirming}
+              onClick={() => doExport(Array.from(selected))}
+            >
+              导出选中({selected.size})
+            </Button>
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              loading={deleting}
+              onClick={doDelete}
+            >
+              删除选中({selected.size})
+            </Button>
+          </>
         )}
         <Button
           size="small"
@@ -308,7 +342,7 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
                 <Divider plain style={{ margin: '4px 0 0', fontSize: 12 }}>
                   1倍图({x1.length})
                 </Divider>
-                <Thumbs items={x1} selected={selected} onToggle={toggleItem} />
+                <Thumbs items={x1} selected={selected} onToggle={toggleItem} onHover={setHoveredItem} />
               </>
             )}
           </>
