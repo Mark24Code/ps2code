@@ -245,6 +245,11 @@ export function ConversationView({ conversationId, onConversationUpdated }: Prop
           readyState={ready.state}
           readyMessage={ready.message}
           onSend={send}
+          onStop={() => {
+            window.api.agentCancel(conversationId)
+            setBusy(false)
+            appendMsg('tool', '⏹ 已停止')
+          }}
           onUpdate={updateConv}
         />
       </Content>

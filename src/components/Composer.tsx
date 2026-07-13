@@ -5,7 +5,8 @@ import {
   CloseCircleFilled,
   EditOutlined,
   FolderOpenOutlined,
-  PaperClipOutlined
+  PaperClipOutlined,
+  PauseCircleFilled
 } from '@ant-design/icons'
 import type { Conversation } from '@shared/types'
 
@@ -17,13 +18,14 @@ interface Props {
   readyState?: 'idle' | 'loading' | 'ok' | 'error'
   readyMessage?: string
   onSend: (text: string) => void
+  onStop: () => void
   onUpdate: (c: Conversation) => void
 }
 
 // 对话框上方:设计稿别针标识 + PS 就绪状态。
 // 下方:导出设置(分行展示,不挤一排)。最后是输入框。
 export function Composer(props: Props): JSX.Element {
-  const { conversation, busy, disabled, designName, readyState, readyMessage, onSend, onUpdate } =
+  const { conversation, busy, disabled, designName, readyState, readyMessage, onSend, onStop, onUpdate } =
     props
   const { message } = App.useApp()
   const [text, setText] = useState('')
@@ -121,19 +123,37 @@ export function Composer(props: Props): JSX.Element {
           }}
           style={{ paddingRight: 140 }}
         />
-        <Typography.Text
-          type="secondary"
-          style={{
-            position: 'absolute',
-            right: 10,
-            bottom: 6,
-            fontSize: 11,
-            pointerEvents: 'none',
-            lineHeight: '20px'
-          }}
-        >
-          回车发送 · Ctrl+Enter 换行
-        </Typography.Text>
+        {busy ? (
+          <Button
+            type="text"
+            size="small"
+            danger
+            icon={<PauseCircleFilled />}
+            onClick={onStop}
+            style={{
+              position: 'absolute',
+              right: 8,
+              bottom: 6,
+              lineHeight: '20px'
+            }}
+          >
+            停止
+          </Button>
+        ) : (
+          <Typography.Text
+            type="secondary"
+            style={{
+              position: 'absolute',
+              right: 10,
+              bottom: 6,
+              fontSize: 11,
+              pointerEvents: 'none',
+              lineHeight: '20px'
+            }}
+          >
+            回车发送 · Ctrl+Enter 换行
+          </Typography.Text>
+        )}
       </div>
 
       {/* 导出路径(输入框下方) */}
