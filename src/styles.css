@@ -172,6 +172,19 @@ body {
   color: var(--text-3);
   flex: 0 0 auto;
 }
+.conv-row .conv-delete {
+  font-size: 12px;
+  color: var(--text-4);
+  opacity: 0;
+  transition: opacity .15s, color .15s;
+  flex: 0 0 auto;
+}
+.conv-row:hover .conv-delete {
+  opacity: 1;
+}
+.conv-row .conv-delete:hover {
+  color: #ff4d4f;
+}
 .conv-empty {
   padding: 6px 10px 6px 30px;
   font-size: 12px;
@@ -317,11 +330,22 @@ body {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .right-tabs .ant-tabs-content {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .right-tabs .ant-tabs-tabpane {
+  min-height: 0;
+  overflow: hidden;
+}
+.right-tabs .ant-tabs-tabpane-active {
+  display: flex;
+  flex-direction: column;
   height: 100%;
 }
 

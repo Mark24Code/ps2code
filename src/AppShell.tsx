@@ -68,6 +68,18 @@ export function AppShell(): JSX.Element {
     setView('conversation')
   }
 
+  const onDeleteConversation = async (conv: Conversation): Promise<void> => {
+    await window.api.convDelete(conv.id)
+    // 如果删除的是当前活跃对话，退回到欢迎页
+    if (activeConvId === conv.id) {
+      setActiveConvId(null)
+      setView('welcome')
+    }
+    // 从哪个项目来的就刷新哪个项目的对话列表
+    const project = projects.find((p) => p.id === conv.projectId)
+    if (project) await loadConvs(project.id)
+  }
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -80,6 +92,7 @@ export function AppShell(): JSX.Element {
         onSelectConversation={onSelectConversation}
         onExpandProject={loadConvs}
         onNewConversationInProject={onNewConversationInProject}
+        onDeleteConversation={onDeleteConversation}
       />
       <div className="app-content">
         {view === 'welcome' && <WelcomeView onNewChat={onNewChat} onDropPsd={importAndStart} />}

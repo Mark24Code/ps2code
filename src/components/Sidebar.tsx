@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { App, Button, Input, Typography } from 'antd'
 import {
+  DeleteOutlined,
   DownOutlined,
   EditOutlined,
   FolderOutlined,
@@ -21,6 +22,7 @@ export interface SidebarProps {
   onSelectConversation: (c: Conversation) => void
   onExpandProject: (projectId: number) => void
   onNewConversationInProject: (projectId: number) => void
+  onDeleteConversation: (conv: Conversation) => void
 }
 
 export function Sidebar(props: SidebarProps): JSX.Element {
@@ -33,7 +35,8 @@ export function Sidebar(props: SidebarProps): JSX.Element {
     onOpenSettings,
     onSelectConversation,
     onExpandProject,
-    onNewConversationInProject
+    onNewConversationInProject,
+    onDeleteConversation
   } = props
   const { modal } = App.useApp()
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
@@ -132,6 +135,20 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                       {c.title}
                     </span>
                     <span className="conv-time">{relativeTime(c.updatedAt)}</span>
+                    <DeleteOutlined
+                      className="conv-delete"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        modal.confirm({
+                          title: '删除对话',
+                          content: `确定要删除「${c.title}」吗？此操作不可撤销。`,
+                          okText: '删除',
+                          okType: 'danger',
+                          cancelText: '取消',
+                          onOk: () => onDeleteConversation(c)
+                        })
+                      }}
+                    />
                   </div>
                 ))}
               {open && convs.length === 0 && (

@@ -199,6 +199,7 @@ cat > "$TMP_JSX" << 'JSXEOF'
         }
 
         var files = [];
+        var meta = [];
         var ok = 0, err = 0;
 
         // 4. 逐个导出
@@ -222,11 +223,13 @@ cat > "$TMP_JSX" << 'JSXEOF'
                 var sm = doc.activeLayer;
                 PS2._push("  已转为智能对象");
 
-                // 4b. 校验非空
+                // 4b. 记录原始边界和尺寸(用于预览元数据)
                 var b = sm.bounds;
                 var w = Math.ceil(b[2].value - b[0].value);
                 var h = Math.ceil(b[3].value - b[1].value);
-                PS2._push("  图层尺寸: " + w + " x " + h + " px");
+                var gx = Math.round(b[0].value);
+                var gy = Math.round(b[1].value);
+                PS2._push("  图层尺寸: " + w + " x " + h + " px  @" + gx + "," + gy);
                 if (w <= 0 || h <= 0) {
                     PS2._push("  跳过: 图层组为空或全部隐藏");
                     sm.remove();
@@ -260,6 +263,14 @@ cat > "$TMP_JSX" << 'JSXEOF'
                     var f1x = exportPng(td, OUT_DIR + '/' + groupName + '.png');
                     PS2._push("  ✓ 1x PNG: " + f1x.fsName);
                     saved.push(f1x.fsName);
+                    meta.push({
+                        file: f1x.name,
+                        group: groupName,
+                        w: Math.ceil(td.width.value),
+                        h: Math.ceil(td.height.value),
+                        x: gx,
+                        y: gy
+                    });
                 }
 
                 // 4f. 导出 2x(放大两倍后导出)
@@ -285,6 +296,14 @@ cat > "$TMP_JSX" << 'JSXEOF'
                     var f2x = exportPng(td, OUT_DIR + '/' + groupName + '@2x.png');
                     PS2._push("  ✓ 2x PNG: " + f2x.fsName);
                     saved.push(f2x.fsName);
+                    meta.push({
+                        file: f2x.name,
+                        group: groupName,
+                        w: Math.ceil(td.width.value),
+                        h: Math.ceil(td.height.value),
+                        x: gx,
+                        y: gy
+                    });
                 }
 
                 // 4g. 清理临时文档,切回原文档
@@ -307,7 +326,8 @@ cat > "$TMP_JSX" << 'JSXEOF'
         if (didOpen) doc.close(SaveOptions.DONOTSAVECHANGES);
         PS2._push("══════════════════════");
         PS2._push("导出完成! 成功: " + ok + "  失败: " + err);
-        return PS2.result(true, { files: files, matched: NAMES.length, ok: ok, err: err, outputDir: OUT_DIR });
+
+        return PS2.result(true, { files: files, meta: meta, matched: NAMES.length, ok: ok, err: err, outputDir: OUT_DIR });
     } catch(e) {
         if (didOpen) try { doc.close(SaveOptions.DONOTSAVECHANGES); } catch(e2) {}
         return PS2.result(false, {}, e.message + (e.line ? " (line " + e.line + ")" : ""));

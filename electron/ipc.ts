@@ -137,7 +137,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.agentLogs, (_e, conversationId: string) => getLogs(conversationId))
 
   // ---------- 导出确认: tmp → exportDir ----------
-  ipcMain.handle(IPC.exportConfirm, async (_e, conversationId: string) => {
+  ipcMain.handle(IPC.exportConfirm, async (_e, conversationId: string, names?: string[]) => {
     const conv = db.getConversation(conversationId)
     if (!conv) throw new Error('对话不存在')
     const dest = conv.exportDir
@@ -145,26 +145,45 @@ export function registerIpc(): void {
     const files = existsSync(conv.tmpDir)
       ? (await readdir(conv.tmpDir)).filter((f) => f.toLowerCase().endsWith('.png'))
       : []
+    // 如果传了 names,只导出选中的文件
+    const filtered = names ? files.filter((f) => names.includes(f)) : files
     // 已占用名集合:目标目录现有文件 + 本次已拷入的名字
     const taken = new Set<string>(existsSync(dest) ? await readdir(dest) : [])
-    for (const f of files) {
+    for (const f of filtered) {
       const name = dedupeFileName(f, taken)
       taken.add(name)
       await copyFile(join(conv.tmpDir, f), join(dest, name))
     }
-    return { ok: true, dir: dest, count: files.length }
+    return { ok: true, dir: dest, count: filtered.length }
   })
 
-  // ---------- 预览: 列出对话 tmp 下的 PNG,返回 dataURL ----------
+  // ---------- 预览: 列出对话 tmp 下的 PNG,返回 dataURL + 元数据 ----------
   ipcMain.handle(IPC.previewList, async (_e, conversationId: string) => {
     const conv = db.getConversation(conversationId)
     if (!conv || !existsSync(conv.tmpDir)) return []
     const files = (await readdir(conv.tmpDir)).filter((f) => f.toLowerCase().endsWith('.png'))
     const { readFile } = await import('fs/promises')
-    const out: { name: string; dataUrl: string }[] = []
+
+    // 读取导出元数据(尺寸/坐标)
+    let metaMap: Record<string, { w: number; h: number; x: number; y: number }> = {}
+    const metaPath = join(conv.tmpDir, '_meta.json')
+    if (existsSync(metaPath)) {
+      try {
+        const metaRaw = await readFile(metaPath, 'utf8')
+        const metaArr = JSON.parse(metaRaw) as { file: string; w: number; h: number; x: number; y: number }[]
+        for (const m of metaArr) metaMap[m.file] = { w: m.w, h: m.h, x: m.x, y: m.y }
+      } catch { /* ignore parse errors */ }
+    }
+
+    const out: { name: string; dataUrl: string; w?: number; h?: number; x?: number; y?: number }[] = []
     for (const f of files) {
       const buf = await readFile(join(conv.tmpDir, f))
-      out.push({ name: f, dataUrl: `data:image/png;base64,${buf.toString('base64')}` })
+      const meta = metaMap[f]
+      out.push({
+        name: f,
+        dataUrl: `data:image/png;base64,${buf.toString('base64')}`,
+        ...(meta || {})
+      })
     }
     return out
   })

@@ -82,10 +82,11 @@ const api = {
   },
 
   // 导出
-  exportConfirm: (conversationId: string): Promise<{ ok: boolean; dir: string; count: number }> =>
-    ipcRenderer.invoke(IPC.exportConfirm, conversationId),
-  previewList: (conversationId: string): Promise<{ name: string; dataUrl: string }[]> =>
-    ipcRenderer.invoke(IPC.previewList, conversationId),
+  exportConfirm: (conversationId: string, names?: string[]): Promise<{ ok: boolean; dir: string; count: number }> =>
+    ipcRenderer.invoke(IPC.exportConfirm, conversationId, names),
+  previewList: (conversationId: string): Promise<
+      { name: string; dataUrl: string; w?: number; h?: number; x?: number; y?: number }[]
+    > => ipcRenderer.invoke(IPC.previewList, conversationId),
 
   // 文件选择
   pickPsd: (): Promise<string | null> => ipcRenderer.invoke(IPC.pickPsd),

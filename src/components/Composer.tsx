@@ -4,6 +4,7 @@ import {
   CheckCircleFilled,
   CloseCircleFilled,
   EditOutlined,
+  FolderOpenOutlined,
   PaperClipOutlined,
   SendOutlined
 } from '@ant-design/icons'
@@ -105,6 +106,15 @@ export function Composer(props: Props): JSX.Element {
           >
             {conversation.exportDir || '(未设置)'}
           </Typography.Text>
+          <Tooltip title="在访达中打开">
+            <Button
+              type="text"
+              size="small"
+              icon={<FolderOpenOutlined />}
+              disabled={!conversation.exportDir}
+              onClick={() => window.api.openPath(conversation.exportDir)}
+            />
+          </Tooltip>
           <Tooltip title="修改导出路径">
             <Button type="text" size="small" icon={<EditOutlined />} onClick={pickExportDir} />
           </Tooltip>

@@ -143,7 +143,28 @@ async function exportGroupsViaShell(
   const cmd = `bash "${scriptPath}" ${args.join(' ')}`
   try {
     const { stdout } = await execAsync(cmd, { timeout: 120000, maxBuffer: 1024 * 1024 })
-    const parsed = JSON.parse(stdout.trim()) as JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>
+    const parsed = JSON.parse(stdout.trim()) as JsxResult<{
+      files: string[]; meta?: { file: string; group: string; w: number; h: number; x: number; y: number }[]
+      matched: number; ok: number; err: number; outputDir: string
+    }>
+
+    // 用实际文件路径的 basename 写 _meta.json(修正 ExtendScript 中文编码问题)
+    if (parsed.ok && parsed.data.meta && parsed.data.files) {
+      try {
+        const { writeFile, mkdir } = await import('fs/promises')
+        const { dirname } = await import('path')
+        const outDir = dirname(parsed.data.files[0])
+        await mkdir(outDir, { recursive: true })
+        const rebased = parsed.data.files.map((f, i) => {
+          const m = parsed.data.meta![i]
+          if (!m) return null
+          const segs = f.split(/[/\\]/)
+          return { file: segs[segs.length - 1], group: m.group, w: m.w, h: m.h, x: m.x, y: m.y }
+        }).filter(Boolean)
+        await writeFile(outDir + '/_meta.json', JSON.stringify(rebased), 'utf8')
+      } catch { /* best-effort: meta 写入失败不影响导出结果 */ }
+    }
+
     return parsed
   } catch (e) {
     const errMsg = (e as Error).message
