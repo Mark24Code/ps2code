@@ -133,10 +133,19 @@ export function SettingsPage(): JSX.Element {
         </Card>
 
         <Card title="关于" size="small">
-          <Descriptions column={1} size="small">
+          <Descriptions column={1} size="small" style={{ marginBottom: 8 }}>
             <Descriptions.Item label="当前版本">{version}</Descriptions.Item>
+            <Descriptions.Item label="作者">Mark24Code</Descriptions.Item>
+            <Descriptions.Item label="项目主页">
+              <a
+                onClick={() => window.api.openExternal('https://github.com/Mark24Code/ps2code')}
+                style={{ cursor: 'pointer' }}
+              >
+                https://github.com/Mark24Code/ps2code
+              </a>
+            </Descriptions.Item>
           </Descriptions>
-          <Space style={{ marginTop: 8 }}>
+          <Space>
             <Button onClick={check}>检查更新</Button>
             {update && !update.error && update.hasUpdate && (
               <>

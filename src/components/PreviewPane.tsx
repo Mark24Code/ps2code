@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { App, Button, Checkbox, Divider, Empty, Input, Modal, Progress, Typography } from 'antd'
+import { App, Button, Checkbox, Divider, Empty, Input, Modal, Progress, Tooltip, Typography } from 'antd'
 import { AppstoreOutlined, DeleteOutlined, ExportOutlined, FolderOpenOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import type { Conversation } from '@shared/types'
 
@@ -248,16 +248,22 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
           {items.length} 个产物
         </Typography.Text>
         <span style={{ borderLeft: '1px solid var(--border)', height: 18, margin: '0 2px' }} />
-        <Button type="text" size="small" icon={<AppstoreOutlined />} onClick={() => setViewMode('grid')}
-          style={{ color: viewMode === 'grid' ? 'var(--brand)' : 'var(--text-3)', padding: '0 4px' }} />
-        <Button type="text" size="small" icon={<UnorderedListOutlined />} onClick={() => setViewMode('list')}
-          style={{ color: viewMode === 'list' ? 'var(--brand)' : 'var(--text-3)', padding: '0 4px' }} />
-        <Button
-          type="text"
-          size="small"
-          icon={<FolderOpenOutlined />}
-          onClick={() => window.api.openPath(conversation.tmpDir)}
-        />
+        <Tooltip title="网格视图">
+          <Button type="text" size="small" icon={<AppstoreOutlined />} onClick={() => setViewMode('grid')}
+            style={{ color: viewMode === 'grid' ? 'var(--brand)' : 'var(--text-3)', padding: '0 4px' }} />
+        </Tooltip>
+        <Tooltip title="列表视图">
+          <Button type="text" size="small" icon={<UnorderedListOutlined />} onClick={() => setViewMode('list')}
+            style={{ color: viewMode === 'list' ? 'var(--brand)' : 'var(--text-3)', padding: '0 4px' }} />
+        </Tooltip>
+        <Tooltip title="打开临时目录">
+          <Button
+            type="text"
+            size="small"
+            icon={<FolderOpenOutlined />}
+            onClick={() => window.api.openPath(conversation.tmpDir)}
+          />
+        </Tooltip>
         <span style={{ flex: 1 }} />
         {selected.size > 0 && (
           <>
