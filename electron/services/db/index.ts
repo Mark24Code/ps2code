@@ -119,11 +119,12 @@ export function updateConversation(id: string, patch: Partial<Conversation>): Co
   if (!cur) throw new Error('conversation not found')
   const next = { ...cur, ...patch }
   db.prepare(
-    `UPDATE conversations SET title=?, export_dir=?, opt_trim=?, opt_1x=?, opt_2x=?,
+    `UPDATE conversations SET title=?, export_dir=?, tmp_dir=?, opt_trim=?, opt_1x=?, opt_2x=?,
      updated_at=datetime('now') WHERE id=?`
   ).run(
     next.title,
     next.exportDir,
+    next.tmpDir,
     next.optTrim ? 1 : 0,
     next.opt1x ? 1 : 0,
     next.opt2x ? 1 : 0,

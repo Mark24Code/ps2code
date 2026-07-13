@@ -1,7 +1,8 @@
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { app } from 'electron'
-import { getBridge } from './index'
+import { getBridge, isUsingTestBridge } from './index'
+import { readPsdMeta } from '../psd'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 
@@ -20,6 +21,14 @@ function jsxDir(): string {
     return join(process.resourcesPath, 'jsx')
   }
   return join(app.getAppPath(), 'scripts', 'jsx')
+}
+
+// 定位 scripts 目录(供 shell 脚本调用)
+function scriptsDir(): string {
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'scripts')
+  }
+  return join(app.getAppPath(), 'scripts')
 }
 
 let commonCache: string | null = null
@@ -79,65 +88,98 @@ export interface ExportParams {
   outputDir: string
 }
 
-export function exportGroups(
+// macOS: 使用 shell 脚本(自包含 JSX + sed + osascript)导出图层组。
+// 沿用 export-group-84.sh 的成功模式:不用 _common.jsxinc、不用 eval、不依赖 PS2.params()。
+async function exportGroupsViaShell(
+  params: ExportParams
+): Promise<JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>> {
+  // 兜底:outputDir 为空时自动生成(防止 DB 中 tmp_dir 未持久化的边缘情况)
+  let outputDir: string = params.outputDir
+  if (!outputDir) {
+    const { randomUUID } = await import('crypto')
+    outputDir = join(app.getPath('home'), '.ps2code', 'sessions', randomUUID(), 'tmp')
+    await (await import('fs/promises')).mkdir(outputDir, { recursive: true })
+  } else {
+    // 确保目录存在
+    const { mkdir } = await import('fs/promises')
+    await mkdir(outputDir, { recursive: true })
+  }
+
+  // 解析 names:优先用传入的 names,否则用 pattern 从 PSD 元数据匹配
+  let names = params.names || []
+  if (names.length === 0 && params.pattern) {
+    try {
+      const meta = await readPsdMeta(params.targetPath)
+      const regex = new RegExp(params.pattern)
+      const walk = (nodes: typeof meta.tree): string[] => {
+        const result: string[] = []
+        for (const n of nodes) {
+          if (n.kind === 'group' && regex.test(n.name)) result.push(n.name)
+          if ((n as any).children) result.push(...walk((n as any).children))
+        }
+        return result
+      }
+      names = walk(meta.tree)
+    } catch (e) {
+      return { ok: false, data: { files: [], matched: 0, ok: 0, err: 0, outputDir: outputDir }, log: [], error: `无法读取 PSD 元数据: ${(e as Error).message}` }
+    }
+  }
+
+  if (names.length === 0) {
+    return { ok: false, data: { files: [], matched: 0, ok: 0, err: 0, outputDir: outputDir }, log: [], error: '没有匹配的图层组(请先用 list_layers 查询,或提供 names/pattern 参数)' }
+  }
+
+  const scriptPath = join(scriptsDir(), 'export-groups.sh')
+  const namesArg = names.join(',')
+  const args = [
+    `--psd "${params.targetPath}"`,
+    `--names "${namesArg}"`,
+    `--output-dir "${outputDir}"`
+  ]
+  if (params.x1) args.push('--1x')
+  if (params.x2) args.push('--2x')
+  if (params.trim) args.push('--trim')
+
+  const cmd = `bash "${scriptPath}" ${args.join(' ')}`
+  try {
+    const { stdout } = await execAsync(cmd, { timeout: 120000, maxBuffer: 1024 * 1024 })
+    const parsed = JSON.parse(stdout.trim()) as JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>
+    return parsed
+  } catch (e) {
+    const errMsg = (e as Error).message
+    // shell 脚本 JSON 输出到 stdout;若 execAsync 本身抛错(超时/信号),用 stderr 兜底
+    if ('stderr' in (e as any)) {
+      const stderr = (e as any).stderr as string
+      try {
+        return JSON.parse(stderr.trim()) as JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>
+      } catch { /* fall through */ }
+    }
+    return { ok: false, data: { files: [], matched: 0, ok: 0, err: 0, outputDir: outputDir }, log: [], error: errMsg }
+  }
+}
+
+// Windows: 保留原 JSX 路径(通过 _common.jsxinc + runScript)
+async function exportGroupsViaJsx(
   params: ExportParams
 ): Promise<JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>> {
   return runScript('export-groups.jsx', {
     pattern: '',
     names: [],
     ...params
-  }).then(async (result) => {
-    if (!result.ok || !result.data.files?.length) return result
-    // 将各中间格式转为最终 PNG
-    const pngFiles: string[] = []
-    for (const filePath of result.data.files) {
-      const ext = filePath.toLowerCase().split('.').pop()
-      if (ext === 'png') {
-        pngFiles.push(filePath) // 已直接输出 PNG,无需转换
-      } else {
-        try {
-          const pngPath = await convertToPng(filePath)
-          if (pngPath) pngFiles.push(pngPath)
-        } catch {
-          pngFiles.push(filePath.replace(/\.(tif|tiff|psd)$/i, '.png'))
-        }
-      }
-    }
-    return {
-      ...result,
-      data: { ...result.data, files: pngFiles }
-    }
   })
 }
 
-// 测试用:注入假转换器(无需真实 sips/PowerShell)
-export let convertToPngOverride: ((filePath: string) => Promise<string>) | null = null
-export function setConvertToPngForTest(fn: ((filePath: string) => Promise<string>) | null): void {
-  convertToPngOverride = fn
-}
-
-// 将图像文件转换为 PNG(macOS 用内置 sips,Windows 用 PowerShell)。
-// 支持 TIFF / PSD 等中间格式。
-async function convertToPng(filePath: string): Promise<string> {
-  if (convertToPngOverride) return convertToPngOverride(filePath)
-  const pngPath = filePath.replace(/\.(tif|tiff|psd)$/i, '.png')
-  const ext = filePath.toLowerCase()
-  if (!ext.endsWith('.tif') && !ext.endsWith('.tiff') && !ext.endsWith('.psd')) throw new Error('不支持的格式')
-
-  if (process.platform === 'darwin') {
-    // macOS 用 sips 转换(系统内置,无需额外安装)
-    await execAsync(`sips -s format png "${tifPath}" --out "${pngPath}"`, { timeout: 30000 })
-  } else if (process.platform === 'win32') {
-    // Windows: 用 PowerShell + System.Drawing
-    await execAsync(
-      `powershell -NoProfile -Command "Add-Type -AssemblyName System.Drawing; $img = [System.Drawing.Bitmap]::FromFile('${tifPath.replace(/'/g, "''")}'); try { $img.Save('${pngPath.replace(/'/g, "''")}', [System.Drawing.Imaging.ImageFormat]::Png); } finally { $img.Dispose(); }"`,
-      { timeout: 30000 }
-    )
-  } else {
-    // Linux/其他平台:复制一份(无实际转换,不失数据)
-    await execAsync(`cp "${tifPath}" "${pngPath}"`, { timeout: 10000 })
+export function exportGroups(
+  params: ExportParams
+): Promise<JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>> {
+  // 测试模式:走 JSX 路径(通过 FakeBridge,不依赖真实 Photoshop / shell)
+  if (isUsingTestBridge()) {
+    return exportGroupsViaJsx(params)
   }
-  return pngPath
+  if (process.platform === 'darwin') {
+    return exportGroupsViaShell(params)
+  }
+  return exportGroupsViaJsx(params)
 }
 
 // 无害测试:返回 PS 版本

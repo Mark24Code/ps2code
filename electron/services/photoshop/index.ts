@@ -168,6 +168,7 @@ $result = $app.DoJavaScript($code)
 }
 
 let bridge: PhotoshopBridge | null = null
+let usingTestBridge = false
 
 export function getBridge(): PhotoshopBridge {
   if (!bridge) {
@@ -179,6 +180,12 @@ export function getBridge(): PhotoshopBridge {
 // 测试用:注入假的 Bridge(无需真实 Photoshop 即可验证脚本拼接/解析链路)
 export function setBridgeForTest(fake: PhotoshopBridge | null): void {
   bridge = fake
+  usingTestBridge = true
+}
+
+// 测试用:检查是否处于测试模式(使用 FakeBridge)
+export function isUsingTestBridge(): boolean {
+  return usingTestBridge
 }
 
 // 程序初始化时调用:检测 Photoshop 并把路径写入 ~/.ps2code/config.json 的 psPath。

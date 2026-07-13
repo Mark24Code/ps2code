@@ -104,32 +104,6 @@ describe('Agent 对话可调用脚本', () => {
     expect(res.content[0].text).toContain('取消')
   })
 
-  // ---- TIFF/PNG 转换相关 ----
-  it('export_groups TIFF→PNG 路径转换:files 扩展名变为 .png', async () => {
-    const project = importProject('/tmp/d.psd', 'd')
-    const conv = createConversation(project.id, '/tmp/export', '/tmp/out')
-
-    fake.reply = JSON.stringify({
-      ok: true,
-      data: { files: ['/tmp/export/组84.tif'], matched: 1, ok: 1, err: 0, outputDir: '/tmp/export' },
-      log: ['--- 处理: 组84', '已复制图层组', '已转为智能对象', '图层尺寸: 100 × 100 px'],
-      error: ''
-    })
-
-    const events: AgentStreamEvent[] = []
-    const handlers = createToolHandlers({
-      targetPath: project.psdPath,
-      conversationId: conv.id,
-      emit: (e) => events.push(e)
-    })
-
-    const res = await handlers.exportGroups({ names: ['组84'] })
-    expect(res.isError).toBeFalsy()
-    const data = JSON.parse(res.content[0].text)
-    // 转换失败时回退到扩展名替换,files 应是 .png 路径
-    expect(data.files[0]).toMatch(/组84\.png$/)
-  })
-
   it('export_groups 工具回传详细日志供 Agent 排查', async () => {
     const project = importProject('/tmp/e.psd', 'e')
     const conv = createConversation(project.id, '/tmp/logtest', '/tmp/out')
@@ -171,7 +145,7 @@ describe('Agent 对话可调用脚本', () => {
 
     fake.reply = JSON.stringify({
       ok: true,
-      data: { files: ['/tmp/partial/ok组.tif'], matched: 3, ok: 1, err: 2, outputDir: '/tmp/partial' },
+      data: { files: ['/tmp/partial/ok组.png'], matched: 3, ok: 1, err: 2, outputDir: '/tmp/partial' },
       log: [
         '--- 处理: ok组',
         '已复制图层组',

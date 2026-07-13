@@ -15,7 +15,7 @@ import { checkUpdate } from './services/updater'
 import { getMainWindow } from './main'
 
 function convTmpDir(conversationId: string): string {
-  return join(app.getPath('temp'), 'ps2code', String(conversationId))
+  return join(app.getPath('home'), '.ps2code', 'sessions', String(conversationId), 'tmp')
 }
 
 export function registerIpc(): void {
