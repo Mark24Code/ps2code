@@ -5,6 +5,7 @@ import {
   DownOutlined,
   EditOutlined,
   FolderOutlined,
+  PlusOutlined,
   RightOutlined,
   SearchOutlined,
   SettingOutlined
@@ -115,10 +116,14 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                   type="text"
                   size="small"
                   className="proj-add"
-                  icon={<EditOutlined />}
+                  icon={<PlusOutlined />}
                   onClick={(e) => {
                     e.stopPropagation()
-                    onNewConversationInProject(p.id)
+                    if (convs.length > 0) {
+                      onSelectConversation(convs[0])
+                    } else {
+                      onNewConversationInProject(p.id)
+                    }
                   }}
                 />
               </div>

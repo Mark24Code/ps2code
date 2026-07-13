@@ -249,7 +249,7 @@ export function ConversationView({ conversationId, onConversationUpdated }: Prop
         />
       </Content>
 
-      <Sider width={360} theme="light" style={{ height: '100%', overflow: 'hidden' }}>
+      <Sider width={360} theme="light" style={{ height: '100%', overflow: 'hidden', borderLeft: '1px solid var(--border)' }}>
         <Tabs
           className="right-tabs"
           defaultActiveKey="preview"

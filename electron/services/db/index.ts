@@ -97,8 +97,9 @@ export function createConversation(
 ): Conversation {
   const id = randomUUID()
   db.prepare(
-    'INSERT INTO conversations (id, project_id, tmp_dir, export_dir) VALUES (?, ?, ?, ?)'
-  ).run(id, projectId, tmpDir, exportDir)
+    `INSERT INTO conversations (id, project_id, title, tmp_dir, export_dir, opt_trim, opt_1x, opt_2x)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, projectId, '新对话', tmpDir, exportDir, 1, 0, 1)
   return mapConversation(db.prepare('SELECT * FROM conversations WHERE id = ?').get(id))
 }
 

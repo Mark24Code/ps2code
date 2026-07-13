@@ -5,8 +5,7 @@ import {
   CloseCircleFilled,
   EditOutlined,
   FolderOpenOutlined,
-  PaperClipOutlined,
-  SendOutlined
+  PaperClipOutlined
 } from '@ant-design/icons'
 import type { Conversation } from '@shared/types'
 
@@ -75,80 +74,91 @@ export function Composer(props: Props): JSX.Element {
 
   return (
     <div className="composer">
-      {/* 导出设置(分行) */}
-      <div className="composer-opts">
-        <div className="opt-row">
-          <Typography.Text type="secondary" className="opt-label">
-            导出倍率
-          </Typography.Text>
-          <Space size={16}>
-            <Checkbox checked={conversation.opt1x} onChange={(e) => patch({ opt1x: e.target.checked })}>
-              1倍图
-            </Checkbox>
-            <Checkbox checked={conversation.opt2x} onChange={(e) => patch({ opt2x: e.target.checked })}>
-              2倍图
-            </Checkbox>
-            <Checkbox
-              checked={conversation.optTrim}
-              onChange={(e) => patch({ optTrim: e.target.checked })}
-            >
-              裁剪透明边
-            </Checkbox>
-          </Space>
-        </div>
-        <div className="opt-row">
-          <Typography.Text type="secondary" className="opt-label">
-            导出路径
-          </Typography.Text>
-          <Typography.Text
-            ellipsis={{ tooltip: conversation.exportDir }}
-            style={{ flex: 1, fontSize: 12 }}
-          >
-            {conversation.exportDir || '(未设置)'}
-          </Typography.Text>
-          <Tooltip title="在访达中打开">
-            <Button
-              type="text"
-              size="small"
-              icon={<FolderOpenOutlined />}
-              disabled={!conversation.exportDir}
-              onClick={() => window.api.openPath(conversation.exportDir)}
-            />
-          </Tooltip>
-          <Tooltip title="修改导出路径">
-            <Button type="text" size="small" icon={<EditOutlined />} onClick={pickExportDir} />
-          </Tooltip>
-        </div>
-      </div>
-
-      {/* 输入框 */}
-      <Space.Compact style={{ width: '100%' }}>
-        <Input.TextArea
-          value={text}
-          placeholder="描述你的需求,例如:把 组93 改名为 组193;或:导出所有以 icon 开头的图层组(⌘/Ctrl+Enter 发送)"
-          autoSize={{ minRows: 2, maxRows: 5 }}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit()
-          }}
-        />
-        <Button
-          type="primary"
-          icon={<SendOutlined />}
-          disabled={busy}
-          onClick={submit}
-          style={{ height: 'auto' }}
-        >
-          发送
-        </Button>
-      </Space.Compact>
-
-      {/* 底部右下角:设计稿别针 + PS 就绪状态图标 */}
+      {/* 设计稿别针 + PS 就绪状态 */}
       <div className="composer-footer">
         <Tag icon={<PaperClipOutlined />} color="blue" variant="filled" className="design-pin">
           {designName ?? '设计稿'}
         </Tag>
         {statusIcon}
+      </div>
+
+      {/* 导出倍率 */}
+      <div className="opt-row">
+        <Typography.Text type="secondary" className="opt-label">
+          导出倍率
+        </Typography.Text>
+        <Space size={16}>
+          <Checkbox checked={conversation.opt1x} onChange={(e) => patch({ opt1x: e.target.checked })}>
+            1倍图
+          </Checkbox>
+          <Checkbox checked={conversation.opt2x} onChange={(e) => patch({ opt2x: e.target.checked })}>
+            2倍图
+          </Checkbox>
+          <Checkbox
+            checked={conversation.optTrim}
+            onChange={(e) => patch({ optTrim: e.target.checked })}
+          >
+            裁剪透明边
+          </Checkbox>
+        </Space>
+      </div>
+
+      {/* 输入框 */}
+      <div style={{ position: 'relative', width: '100%' }}>
+        <Input.TextArea
+          value={text}
+          placeholder="描述你的需求…"
+          autoSize={{ minRows: 1, maxRows: 5 }}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              // Ctrl/Cmd+Enter → 换行
+              if (e.ctrlKey || e.metaKey) return
+              // 纯 Enter → 发送
+              e.preventDefault()
+              submit()
+            }
+          }}
+          style={{ paddingRight: 140 }}
+        />
+        <Typography.Text
+          type="secondary"
+          style={{
+            position: 'absolute',
+            right: 10,
+            bottom: 6,
+            fontSize: 11,
+            pointerEvents: 'none',
+            lineHeight: '20px'
+          }}
+        >
+          回车发送 · Ctrl+Enter 换行
+        </Typography.Text>
+      </div>
+
+      {/* 导出路径(输入框下方) */}
+      <div className="opt-row">
+        <Typography.Text type="secondary" className="opt-label">
+          导出路径
+        </Typography.Text>
+        <Typography.Text
+          ellipsis={{ tooltip: conversation.exportDir }}
+          style={{ flex: 1, fontSize: 12 }}
+        >
+          {conversation.exportDir || '(未设置)'}
+        </Typography.Text>
+        <Tooltip title="在访达中打开">
+          <Button
+            type="text"
+            size="small"
+            icon={<FolderOpenOutlined />}
+            disabled={!conversation.exportDir}
+            onClick={() => window.api.openPath(conversation.exportDir)}
+          />
+        </Tooltip>
+        <Tooltip title="修改导出路径">
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={pickExportDir} />
+        </Tooltip>
       </div>
     </div>
   )

@@ -238,18 +238,13 @@ body {
 .composer-design .design-pin {
   font-weight: 500;
 }
-.composer-opts {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.composer-opts .opt-row {
+.composer .opt-row {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin: 4px 0;
 }
-.composer-opts .opt-label {
+.composer .opt-label {
   width: 64px;
   flex: 0 0 64px;
   font-size: 12px;
@@ -258,9 +253,8 @@ body {
 .composer-footer {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 8px;
-  margin-top: 8px;
+  margin: 6px 0;
 }
 .composer-footer .design-pin {
   font-weight: 500;
