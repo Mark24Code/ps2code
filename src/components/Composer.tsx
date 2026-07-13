@@ -60,7 +60,7 @@ export function Composer(props: Props): JSX.Element {
   const statusIcon =
     readyState === 'ok' ? (
       <Tooltip title="Photoshop 已就绪">
-        <CheckCircleFilled style={{ color: 'var(--ok, #2e7d46)' }} />
+        <CheckCircleFilled style={{ color: '#52c41a' }} />
       </Tooltip>
     ) : readyState === 'loading' ? (
       <Tooltip title="正在打开 Photoshop…">
