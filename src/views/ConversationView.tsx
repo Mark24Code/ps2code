@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, App, Button, Drawer, Empty, Space, Spin, Tabs, Tooltip, Typography } from 'antd'
+import { Alert, App, Button, Drawer, Empty, Space, Spin, Tooltip, Typography } from 'antd'
 import { FolderOpenOutlined, ProfileOutlined } from '@ant-design/icons'
 import type { AgentStreamEvent, Conversation, Message, Project } from '@shared/types'
 import { Composer } from '../components/Composer'
@@ -32,6 +32,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
   const [ready, setReady] = useState<Ready>({ state: 'idle' })
   const [logOpen, setLogOpen] = useState(false)
   const [logs, setLogs] = useState<{ ts: number; level: string; message: string }[]>([])
+  const [rightTab, setRightTab] = useState<'preview' | 'layers'>('preview')
   const msgEndRef = useRef<HTMLDivElement>(null)
 
   // 右侧面板可拖拽宽度
@@ -318,29 +319,49 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
       />
 
       {/* 右侧面板(可拖拽宽度) */}
-      <div style={{ width: rightWidth, height: '100%', overflow: 'hidden', borderLeft: '1px solid var(--border)', flexShrink: 0 }}>
-        <Tabs
-          className="right-tabs"
-          defaultActiveKey="preview"
-          items={[
-            {
-              key: 'preview',
-              label: '导出预览',
-              children: (
-                <PreviewPane conversation={conv} nonce={previewNonce} exporting={exporting} />
-              )
-            },
-            {
-              key: 'layers',
-              label: '图层结构',
-              children: (
-                <div style={{ padding: 12, height: '100%', overflow: 'auto' }}>
-                  <LayerTree psdPath={project.psdPath} />
-                </div>
-              )
-            }
-          ]}
-        />
+      <div style={{ width: rightWidth, height: '100%', overflow: 'hidden', borderLeft: '1px solid var(--border)', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+        {/* 自定义 Tab 栏 */}
+        <div style={{
+          display: 'flex', flexShrink: 0,
+          borderBottom: '1px solid var(--border)',
+          padding: '0 12px'
+        }}>
+          {([
+            ['preview', '导出预览'],
+            ['layers', '图层结构']
+          ] as const).map(([key, label]) => (
+            <div
+              key={key}
+              onClick={() => setRightTab(key)}
+              style={{
+                padding: '12px 16px',
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: rightTab === key ? 600 : 400,
+                color: rightTab === key ? 'var(--brand)' : 'var(--text-2)',
+                borderBottom: rightTab === key ? '2px solid var(--brand)' : '2px solid transparent',
+                transition: 'color .15s, border-color .15s',
+                userSelect: 'none'
+              }}
+            >
+              {label}
+            </div>
+          ))}
+        </div>
+
+        {/* Tab 内容 */}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {rightTab === 'preview' && (
+            <PreviewPane conversation={conv} nonce={previewNonce} exporting={exporting} />
+          )}
+          {rightTab === 'layers' && (
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+              <div style={{ padding: 12 }}>
+                <LayerTree psdPath={project.psdPath} />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
