@@ -23,7 +23,8 @@ type ViewMode = 'grid' | 'list'
 function GridThumbs({
   items,
   selected,
-  onToggle
+  onToggle,
+  onHover
 }: {
   items: PreviewItem[]
   selected: Set<string>
@@ -72,7 +73,8 @@ function GridThumbs({
 function ListThumbs({
   items,
   selected,
-  onToggle
+  onToggle,
+  onHover
 }: {
   items: PreviewItem[]
   selected: Set<string>
