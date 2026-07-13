@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Empty, Spin, Tree, Typography } from 'antd'
+import { App, Button, Empty, Spin, Tooltip, Tree, Typography } from 'antd'
 import { FolderOutlined, PictureOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { DataNode } from 'antd/es/tree'
 import type { PsdLayerNode, PsdMeta } from '@shared/types'
@@ -26,6 +26,7 @@ function toDataNode(node: PsdLayerNode): DataNode {
 }
 
 export function LayerTree({ psdPath }: Props): JSX.Element {
+  const { message } = App.useApp()
   const [meta, setMeta] = useState<PsdMeta | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -39,6 +40,19 @@ export function LayerTree({ psdPath }: Props): JSX.Element {
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
   }, [psdPath])
+
+  const refresh = useCallback((): void => {
+    setError('')
+    setLoading(true)
+    window.api
+      .psdRead(psdPath)
+      .then((m) => {
+        setMeta(m)
+        message.success('图层已刷新')
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false))
+  }, [psdPath, message])
 
   useEffect(() => {
     setMeta(null)
@@ -76,15 +90,16 @@ export function LayerTree({ psdPath }: Props): JSX.Element {
             ? `画布 ${meta.width}×${meta.height} · ${meta.groupCount} 组 / ${meta.layerCount} 层`
             : '图层结构'}
         </Typography.Text>
-        <Button
-          size="small"
-          icon={<ReloadOutlined />}
-          loading={loading}
-          onClick={load}
-          title="重新读取最新设计稿状态"
-        >
-          刷新
-        </Button>
+        <Tooltip title="获取最新图层信息">
+          <Button
+            size="small"
+            icon={<ReloadOutlined />}
+            loading={loading}
+            onClick={refresh}
+          >
+            刷新
+          </Button>
+        </Tooltip>
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', minHeight: 0, paddingTop: 8 }}>
