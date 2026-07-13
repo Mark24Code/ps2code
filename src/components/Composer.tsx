@@ -128,9 +128,9 @@ export function Composer(props: Props): JSX.Element {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
-              // Ctrl/Cmd+Enter → 换行
-              if (e.ctrlKey || e.metaKey) return
-              // 纯 Enter → 发送
+              // Enter → 换行
+              if (!e.ctrlKey && !e.metaKey) return
+              // Ctrl/Cmd+Enter → 发送
               e.preventDefault()
               submit()
             }
@@ -165,7 +165,7 @@ export function Composer(props: Props): JSX.Element {
               lineHeight: '20px'
             }}
           >
-            回车发送 · Ctrl+Enter 换行
+            Ctrl+Enter 发送 · Enter 换行
           </Typography.Text>
         )}
       </div>
