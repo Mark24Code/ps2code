@@ -252,7 +252,6 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
           style={{ color: viewMode === 'grid' ? 'var(--brand)' : 'var(--text-3)', padding: '0 4px' }} />
         <Button type="text" size="small" icon={<UnorderedListOutlined />} onClick={() => setViewMode('list')}
           style={{ color: viewMode === 'list' ? 'var(--brand)' : 'var(--text-3)', padding: '0 4px' }} />
-        <span style={{ flex: 1 }} />
         <Button
           type="text"
           size="small"

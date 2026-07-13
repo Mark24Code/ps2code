@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, App, Button, Drawer, Empty, Layout, Space, Spin, Tabs, Tooltip, Typography } from 'antd'
+import { Alert, App, Button, Drawer, Empty, Space, Spin, Tabs, Tooltip, Typography } from 'antd'
 import { FolderOpenOutlined, ProfileOutlined } from '@ant-design/icons'
 import type { AgentStreamEvent, Conversation, Message, Project } from '@shared/types'
 import { Composer } from '../components/Composer'
@@ -7,8 +7,6 @@ import { PreviewPane } from '../components/PreviewPane'
 import { LayerTree } from '../components/LayerTree'
 import { MessageBubble } from '../components/MessageBubble'
 import { ThinkingBubble } from '../components/ThinkingBubble'
-
-const { Content, Sider } = Layout
 
 interface StreamPayload {
   conversationId: string
@@ -35,6 +33,42 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
   const [logOpen, setLogOpen] = useState(false)
   const [logs, setLogs] = useState<{ ts: number; level: string; message: string }[]>([])
   const msgEndRef = useRef<HTMLDivElement>(null)
+
+  // 右侧面板可拖拽宽度
+  const [rightWidth, setRightWidth] = useState(680)
+  const draggingRef = useRef(false)
+  const startXRef = useRef(0)
+  const startWRef = useRef(420)
+
+  const onDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    draggingRef.current = true
+    startXRef.current = e.clientX
+    startWRef.current = rightWidth
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [rightWidth])
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingRef.current) return
+      const delta = startXRef.current - e.clientX
+      const next = Math.max(280, Math.min(700, startWRef.current + delta))
+      setRightWidth(next)
+    }
+    const onUp = () => {
+      if (!draggingRef.current) return
+      draggingRef.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [])
 
   // 载入对话 + 项目 + 消息
   useEffect(() => {
@@ -145,8 +179,8 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
   const gateDisabled = ready.state !== 'ok'
 
   return (
-    <Layout style={{ height: '100%', overflow: 'hidden' }}>
-      <Content style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div style={{ height: '100%', overflow: 'hidden', display: 'flex' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
         <div className="conv-toolbar">
           <Typography.Text className="title" title={conv.title}>
             {conv.title}
@@ -266,9 +300,25 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
           }}
           onUpdate={updateConv}
         />
-      </Content>
+      </div>
 
-      <Sider width={420} theme="light" style={{ height: '100%', overflow: 'hidden', borderLeft: '1px solid var(--border)' }}>
+      {/* 拖拽分割条 */}
+      <div
+        onMouseDown={onDividerMouseDown}
+        style={{
+          width: 5,
+          cursor: 'col-resize',
+          flexShrink: 0,
+          background: 'transparent',
+          transition: 'background .15s',
+          zIndex: 10
+        }}
+        onMouseEnter={(e) => { if (!draggingRef.current) (e.target as HTMLElement).style.background = 'var(--border)' }}
+        onMouseLeave={(e) => { if (!draggingRef.current) (e.target as HTMLElement).style.background = 'transparent' }}
+      />
+
+      {/* 右侧面板(可拖拽宽度) */}
+      <div style={{ width: rightWidth, height: '100%', overflow: 'hidden', borderLeft: '1px solid var(--border)', flexShrink: 0 }}>
         <Tabs
           className="right-tabs"
           defaultActiveKey="preview"
@@ -291,7 +341,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
             }
           ]}
         />
-      </Sider>
-    </Layout>
+      </div>
+    </div>
   )
 }
