@@ -122,11 +122,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                   icon={<PlusOutlined />}
                   onClick={(e) => {
                     e.stopPropagation()
-                    if (convs.length > 0) {
-                      onSelectConversation(convs[0])
-                    } else {
-                      onNewConversationInProject(p.id)
-                    }
+                    onNewConversationInProject(p.id)
                   }}
                 />
               </div>
