@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { App, Button, Checkbox, Divider, Empty, Image, Input, Progress, Space, Typography } from 'antd'
-import { ExportOutlined, FolderOpenOutlined } from '@ant-design/icons'
+import { App, Button, Checkbox, Divider, Empty, Input, Progress, Typography } from 'antd'
+import { AppstoreOutlined, ExportOutlined, FolderOpenOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import type { Conversation } from '@shared/types'
 
 interface Props {
@@ -18,7 +18,9 @@ interface PreviewItem {
   y?: number
 }
 
-function Thumbs({
+type ViewMode = 'grid' | 'list'
+
+function GridThumbs({
   items,
   selected,
   onToggle
@@ -26,28 +28,21 @@ function Thumbs({
   items: PreviewItem[]
   selected: Set<string>
   onToggle: (name: string, checked: boolean) => void
+  onHover: (it: PreviewItem | null) => void
 }): JSX.Element {
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 10,
-        padding: '4px 12px 12px'
-      }}
-    >
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '4px 12px 12px' }}>
       {items.map((it) => {
         const isChecked = selected.has(it.name)
         return (
           <div
             key={it.name}
+            onMouseEnter={() => onHover(it)}
+            onMouseLeave={() => onHover(null)}
             onClick={() => onToggle(it.name, !isChecked)}
             style={{
               border: isChecked ? '2px solid #1677ff' : '1px solid var(--border)',
-              borderRadius: 8,
-              padding: 6,
-              textAlign: 'center',
-              cursor: 'pointer',
+              borderRadius: 8, padding: 6, textAlign: 'center', cursor: 'pointer',
               background: isChecked ? '#e6f4ff' : '#fff',
               transition: 'border-color .2s, background .2s'
             }}
@@ -58,28 +53,62 @@ function Thumbs({
               onClick={(e) => e.stopPropagation()}
               onChange={(e) => onToggle(it.name, e.target.checked)}
             />
-            <Image
-              src={it.dataUrl}
-              alt={it.name}
-              style={{ maxHeight: 120, objectFit: 'contain' }}
-              preview={false}
-            />
-            <Typography.Text
-              ellipsis={{ tooltip: it.name }}
-              style={{ display: 'block', fontSize: 11, marginTop: 4 }}
-              type="secondary"
-            >
+            <img src={it.dataUrl} alt={it.name} style={{ maxHeight: 120, maxWidth: '100%', objectFit: 'contain' }} />
+            <Typography.Text ellipsis={{ tooltip: it.name }} style={{ display: 'block', fontSize: 11, marginTop: 4 }} type="secondary">
               {it.name}
             </Typography.Text>
             {it.w !== undefined && (
-              <Typography.Text
-                style={{ display: 'block', fontSize: 10, lineHeight: '15px' }}
-                type="secondary"
-              >
-                {it.w}×{it.h}
-                {it.x !== undefined ? ` · @${it.x},${it.y}` : ''}
+              <Typography.Text type="secondary" style={{ display: 'block', fontSize: 10, lineHeight: '15px' }}>
+                {it.w}×{it.h}{it.x !== undefined ? ` · @${it.x},${it.y}` : ''}
               </Typography.Text>
             )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function ListThumbs({
+  items,
+  selected,
+  onToggle
+}: {
+  items: PreviewItem[]
+  selected: Set<string>
+  onToggle: (name: string, checked: boolean) => void
+  onHover: (it: PreviewItem | null) => void
+}): JSX.Element {
+  return (
+    <div style={{ padding: '0 12px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {items.map((it) => {
+        const isChecked = selected.has(it.name)
+        return (
+          <div
+            key={it.name}
+            onMouseEnter={() => onHover(it)}
+            onMouseLeave={() => onHover(null)}
+            onClick={() => onToggle(it.name, !isChecked)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: 6,
+              border: isChecked ? '2px solid #1677ff' : '1px solid var(--border)',
+              borderRadius: 8, cursor: 'pointer',
+              background: isChecked ? '#e6f4ff' : '#fff',
+              transition: 'border-color .2s, background .2s'
+            }}
+          >
+            <Checkbox checked={isChecked} onClick={(e) => e.stopPropagation()} onChange={(e) => onToggle(it.name, e.target.checked)} />
+            <div style={{ width: 48, height: 48, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa', borderRadius: 4, overflow: 'hidden' }}>
+              <img src={it.dataUrl} alt={it.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Typography.Text ellipsis={{ tooltip: it.name }} style={{ display: 'block', fontSize: 12, lineHeight: '18px' }}>{it.name}</Typography.Text>
+              {it.w !== undefined && (
+                <Typography.Text type="secondary" style={{ fontSize: 10, lineHeight: '15px' }}>
+                  {it.w}×{it.h}{it.x !== undefined ? ` · @${it.x},${it.y}` : ''}
+                </Typography.Text>
+              )}
+            </div>
           </div>
         )
       })}
@@ -93,6 +122,7 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
   const [confirming, setConfirming] = useState(false)
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
 
   useEffect(() => {
     window.api.previewList(conversation.id).then((list) => {
@@ -146,6 +176,28 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
   }
 
   const selectAll = selected.size > 0 && selected.size === filtered.length
+  const Thumbs = viewMode === 'grid' ? GridThumbs : ListThumbs
+
+  // 空格放大预览
+  const [hoveredItem, setHoveredItem] = useState<PreviewItem | null>(null)
+  const [previewItem, setPreviewItem] = useState<PreviewItem | null>(null)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.code !== 'Space') return
+      // 避免在输入框中触发
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      e.preventDefault()
+      if (previewItem) {
+        setPreviewItem(null)
+      } else if (hoveredItem) {
+        setPreviewItem(hoveredItem)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [hoveredItem, previewItem])
 
   return (
     <div
@@ -170,7 +222,14 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
         <Typography.Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
           {items.length} 个产物
         </Typography.Text>
+        <span style={{ borderLeft: '1px solid var(--border)', height: 18, margin: '0 2px' }} />
+        <Button type="text" size="small" icon={<AppstoreOutlined />} onClick={() => setViewMode('grid')}
+          style={{ color: viewMode === 'grid' ? 'var(--brand)' : 'var(--text-3)', padding: '0 4px' }} />
+        <Button type="text" size="small" icon={<UnorderedListOutlined />} onClick={() => setViewMode('list')}
+          style={{ color: viewMode === 'list' ? 'var(--brand)' : 'var(--text-3)', padding: '0 4px' }} />
+        <span style={{ flex: 1 }} />
         <Button
+          type="text"
           size="small"
           icon={<FolderOpenOutlined />}
           onClick={() => window.api.openPath(conversation.tmpDir)}
@@ -239,7 +298,7 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
                 <Divider plain style={{ margin: '4px 0 0', fontSize: 12 }}>
                   2倍图({x2.length})
                 </Divider>
-                <Thumbs items={x2} selected={selected} onToggle={toggleItem} />
+                <Thumbs items={x2} selected={selected} onToggle={toggleItem} onHover={setHoveredItem} />
               </>
             )}
             {x1.length > 0 && (
@@ -253,6 +312,25 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
           </>
         )}
       </div>
+
+      {/* 空格放大预览 Modal */}
+      {previewItem && (
+        <div
+          onClick={() => setPreviewItem(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,.65)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            cursor: 'zoom-out'
+          }}
+        >
+          <img
+            src={previewItem.dataUrl}
+            alt={previewItem.name}
+            style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', background: '#fff', borderRadius: 8, padding: 16 }}
+          />
+        </div>
+      )}
     </div>
   )
 }

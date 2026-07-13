@@ -315,24 +315,23 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .right-tabs .ant-tabs-nav {
   margin: 0;
   padding: 0 12px;
+  flex-shrink: 0;
 }
 .right-tabs .ant-tabs-content-holder {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
 }
 .right-tabs .ant-tabs-content {
-  flex: 1;
-  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 .right-tabs .ant-tabs-tabpane {
-  min-height: 0;
   height: 100%;
 }
 .right-tabs .ant-tabs-tabpane-active {
