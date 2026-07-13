@@ -22,6 +22,8 @@ export function AppShell(): JSX.Element {
   const [convStatus, setConvStatus] = useState<Record<string, ConvStatus>>({})
   const activeConvIdRef = useRef(activeConvId)
   activeConvIdRef.current = activeConvId
+  const convStatusRef = useRef(convStatus)
+  convStatusRef.current = convStatus
 
   // 全局监听 agent stream 事件,追踪各对话的 busy/unread 状态
   useEffect(() => {
@@ -133,6 +135,30 @@ export function AppShell(): JSX.Element {
     if (project) await loadConvs(project.id)
   }
 
+  const onDeleteProject = async (project: Project): Promise<void> => {
+    // 先终止该项目下所有正在运行的对话
+    const convsInProject = conversations[project.id] ?? []
+    for (const c of convsInProject) {
+      if (convStatusRef.current[c.id]?.busy) {
+        window.api.agentCancel(c.id)
+      }
+    }
+    await window.api.projectDelete(project.id)
+    // 如果当前活跃对话属于被删除的项目，退回到欢迎页
+    if (convsInProject.some((c) => c.id === activeConvId)) {
+      setActiveConvId(null)
+      setView('welcome')
+    }
+    // 刷新项目列表
+    await loadProjects()
+    // 清除已缓存的对话列表
+    setConversations((prev) => {
+      const next = { ...prev }
+      delete next[project.id]
+      return next
+    })
+  }
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -147,6 +173,7 @@ export function AppShell(): JSX.Element {
         onExpandProject={loadConvs}
         onNewConversationInProject={onNewConversationInProject}
         onDeleteConversation={onDeleteConversation}
+        onDeleteProject={onDeleteProject}
       />
       <div className="app-content">
         {view === 'welcome' && <WelcomeView onNewChat={onNewChat} onDropPsd={importAndStart} />}

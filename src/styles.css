@@ -143,6 +143,23 @@ body {
 .proj-row:hover .proj-add {
   opacity: 1;
 }
+.proj-row .proj-more {
+  font-size: 12px;
+  color: var(--text-3);
+  opacity: 0;
+  transition: opacity .15s, color .15s;
+  flex: 0 0 auto;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+.proj-row:hover .proj-more {
+  opacity: 1;
+}
+.proj-row .proj-more:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
 
 .conv-row {
   display: flex;

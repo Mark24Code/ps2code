@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
-import { App, Button, Input, Typography } from 'antd'
+import { App, Button, Input, Popover, Typography } from 'antd'
 import {
-  DeleteOutlined,
   DownOutlined,
   EditOutlined,
+  EllipsisOutlined,
   FolderOutlined,
   PlusOutlined,
   RightOutlined,
@@ -26,6 +26,7 @@ export interface SidebarProps {
   onExpandProject: (projectId: number) => void
   onNewConversationInProject: (projectId: number) => void
   onDeleteConversation: (conv: Conversation) => void
+  onDeleteProject: (project: Project) => void
 }
 
 export function Sidebar(props: SidebarProps): JSX.Element {
@@ -40,7 +41,8 @@ export function Sidebar(props: SidebarProps): JSX.Element {
     onSelectConversation,
     onExpandProject,
     onNewConversationInProject,
-    onDeleteConversation
+    onDeleteConversation,
+    onDeleteProject
   } = props
   const { modal } = App.useApp()
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
@@ -115,6 +117,37 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                 <span className="proj-name" title={p.psdPath}>
                   {p.name}
                 </span>
+                <Popover
+                  trigger="click"
+                  placement="right"
+                  content={
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          modal.confirm({
+                            title: '删除设计稿',
+                            content: `确定要删除「${p.name}」及其下所有对话吗？此操作不可撤销。`,
+                            okText: '删除',
+                            okType: 'danger',
+                            cancelText: '取消',
+                            onOk: () => onDeleteProject(p)
+                          })
+                        }}
+                      >
+                        删除设计稿
+                      </Button>
+                    </div>
+                  }
+                >
+                  <EllipsisOutlined
+                    className="proj-more"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </Popover>
                 <Button
                   type="text"
                   size="small"
