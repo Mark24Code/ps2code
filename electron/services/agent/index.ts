@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto'
 import type { AgentStreamEvent } from '../../../shared/types'
 import { resolveApiConfig, buildAgentEnv } from '../../../shared/apiConfig'
 import { addLog } from './logStore'
-import { getConversation, getProject, getSettings } from '../db'
+import { getConversation, getProject, getSettings, listMessages } from '../db'
 import { readPsdMeta } from '../psd'
 import { createToolHandlers } from './agentTools'
 
@@ -32,6 +32,8 @@ function requestConfirm(emit: Emit, prompt: string, payload: unknown): Promise<b
 }
 
 const abortMap = new Map<string, AbortController>()
+// 已通过 resume 建立过 session 的对话（首次用 sessionId 创建，之后用 resume 延续）
+const resumedSessions = new Set<string>()
 
 export function cancelAgent(conversationId: string): void {
   abortMap.get(conversationId)?.abort()
@@ -82,6 +84,37 @@ export async function runAgent(
     layerSummary = `设计稿尺寸 ${meta.width}x${meta.height},共 ${meta.groupCount} 个图层组。组名示例(最多50个):\n${names.slice(0, 50).join(', ')}`
   } catch (e) {
     layerSummary = `(读取图层树失败: ${(e as Error).message})`
+  }
+
+  // 读取本对话的历史消息，作为上下文延续（累加数组，每轮都带上之前所有轮次）
+  let historyContext = ''
+  try {
+    const allMsgs = listMessages(conversationId)
+    const historyLines: string[] = []
+    for (const msg of allMsgs) {
+      if (msg.role === 'user') {
+        historyLines.push(`用户: ${msg.content}`)
+      } else if (msg.role === 'assistant') {
+        // 只取前 200 字符，避免提示词过长
+        const snippet = msg.content.length > 200 ? msg.content.slice(0, 200) + '…' : msg.content
+        historyLines.push(`助手: ${snippet}`)
+      }
+    }
+    // 移除最后一条用户消息（即当前正要发送的 userText，避免重复）
+    if (historyLines.length > 0) {
+      const last = historyLines[historyLines.length - 1]
+      if (last.startsWith('用户: ')) {
+        historyLines.pop()
+      }
+    }
+    if (historyLines.length > 0) {
+      historyContext = '\n\n【历史对话记录】\n' + historyLines.join('\n')
+      addLog(conversationId, 'context', `历史消息: ${historyLines.length} 条`)
+    } else {
+      addLog(conversationId, 'context', '历史消息: 0 条(首轮对话)')
+    }
+  } catch (e) {
+    addLog(conversationId, 'context', `历史消息读取失败: ${(e as Error).message}`)
   }
 
   // 本地工具:复用抽出的 agentTools handler(与测试同源)
@@ -167,6 +200,22 @@ export async function runAgent(
   )
 
   try {
+    // conversationId 本身就是 UUID，直接作为 SDK session 标识：
+    //  - 首次调用用 sessionId 创建固定 ID 的 session
+    //  - 后续调用用 resume 延续同一 session，SDK 自动加载完整对话历史
+    const isFirstSession = !resumedSessions.has(conversationId)
+    if (isFirstSession) {
+      resumedSessions.add(conversationId)
+    }
+    const sessionOption: Record<string, string> = {}
+    if (isFirstSession) {
+      sessionOption.sessionId = conversationId
+      addLog(conversationId, 'context', `创建会话: ${conversationId}`)
+    } else {
+      sessionOption.resume = conversationId
+      addLog(conversationId, 'context', `恢复会话: ${conversationId}`)
+    }
+
     for await (const message of query({
       prompt: userText,
       options: {
@@ -176,6 +225,7 @@ export async function runAgent(
         allowedTools: ['mcp__ps2code__*'],
         maxTurns: 20,
         abortController: abort,
+        ...sessionOption,
         // Electron 主进程里没有独立 node 可执行文件:用 Electron 自身二进制,
         // 并通过 ELECTRON_RUN_AS_NODE=1 让子进程以纯 Node 模式运行 SDK 的 CLI,
         // 否则 spawn 出的进程无法启动 → 一直卡在"思考中"。
