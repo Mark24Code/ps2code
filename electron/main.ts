@@ -29,7 +29,7 @@ function setAppIcon(): void {
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1200,
+    width: 1600,
     height: 800,
     minWidth: 900,
     minHeight: 500,

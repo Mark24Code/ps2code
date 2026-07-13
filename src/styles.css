@@ -364,18 +364,26 @@ body {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .right-tabs .ant-tabs-content {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .right-tabs .ant-tabs-tabpane {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 .right-tabs .ant-tabs-tabpane-active {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex: 1;
+  min-height: 0;
 }
 
 /* ---------- 思考中气泡(Codex 风格) ---------- */
