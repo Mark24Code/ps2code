@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { App } from 'antd'
-import type { Conversation, Project } from '@shared/types'
+import type { AgentStreamEvent, Conversation, Project } from '@shared/types'
 import { Sidebar } from './components/Sidebar'
 import { ConversationView } from './views/ConversationView'
 import { SettingsPage } from './pages/SettingsPage'
@@ -8,12 +8,50 @@ import { WelcomeView } from './views/WelcomeView'
 
 type View = 'welcome' | 'conversation' | 'settings'
 
+export interface ConvStatus {
+  busy: boolean
+  unread: boolean
+}
+
 export function AppShell(): JSX.Element {
   const { message } = App.useApp()
   const [projects, setProjects] = useState<Project[]>([])
   const [conversations, setConversations] = useState<Record<number, Conversation[]>>({})
   const [view, setView] = useState<View>('welcome')
   const [activeConvId, setActiveConvId] = useState<string | null>(null)
+  const [convStatus, setConvStatus] = useState<Record<string, ConvStatus>>({})
+  const activeConvIdRef = useRef(activeConvId)
+  activeConvIdRef.current = activeConvId
+
+  // 全局监听 agent stream 事件,追踪各对话的 busy/unread 状态
+  useEffect(() => {
+    const off = window.api.onAgentStream((raw) => {
+      const { conversationId: cid, event } = raw as {
+        conversationId: string
+        event: AgentStreamEvent
+      }
+      switch (event.type) {
+        case 'text':
+        case 'tool_use':
+          setConvStatus((prev) => {
+            if (prev[cid]?.busy) return prev
+            return { ...prev, [cid]: { busy: true, unread: false } }
+          })
+          break
+        case 'result':
+        case 'error':
+          setConvStatus((prev) => ({
+            ...prev,
+            [cid]: {
+              busy: false,
+              unread: activeConvIdRef.current !== cid
+            }
+          }))
+          break
+      }
+    })
+    return off
+  }, [])
 
   const loadProjects = useCallback(async (): Promise<Project[]> => {
     const list = await window.api.projectList()
@@ -66,7 +104,22 @@ export function AppShell(): JSX.Element {
   const onSelectConversation = (c: Conversation): void => {
     setActiveConvId(c.id)
     setView('conversation')
+    // 清除未读标记
+    setConvStatus((prev) => {
+      if (!prev[c.id]?.unread) return prev
+      return { ...prev, [c.id]: { ...prev[c.id], unread: false } }
+    })
   }
+
+  const onConvStatusChange = useCallback(
+    (convId: string, patch: Partial<ConvStatus>) => {
+      setConvStatus((prev) => ({
+        ...prev,
+        [convId]: { busy: false, unread: false, ...prev[convId], ...patch }
+      }))
+    },
+    []
+  )
 
   const onDeleteConversation = async (conv: Conversation): Promise<void> => {
     await window.api.convDelete(conv.id)
@@ -86,6 +139,7 @@ export function AppShell(): JSX.Element {
         projects={projects}
         conversations={conversations}
         activeConversationId={activeConvId}
+        convStatus={convStatus}
         view={view}
         onNewChat={onNewChat}
         onOpenSettings={() => setView('settings')}
@@ -106,6 +160,7 @@ export function AppShell(): JSX.Element {
             key={activeConvId}
             conversationId={activeConvId}
             onConversationUpdated={refreshLoadedConvs}
+            onConvStatusChange={onConvStatusChange}
           />
         )}
       </div>

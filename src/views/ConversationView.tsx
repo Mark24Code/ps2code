@@ -20,9 +20,10 @@ type Ready = { state: 'idle' | 'loading' | 'ok' | 'error'; message?: string }
 interface Props {
   conversationId: string
   onConversationUpdated: () => void // 通知外层刷新侧栏(标题/时间)
+  onConvStatusChange: (convId: string, patch: { busy?: boolean; unread?: boolean }) => void
 }
 
-export function ConversationView({ conversationId, onConversationUpdated }: Props): JSX.Element {
+export function ConversationView({ conversationId, onConversationUpdated, onConvStatusChange }: Props): JSX.Element {
   const [conv, setConv] = useState<Conversation | null>(null)
   const [project, setProject] = useState<Project | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -123,6 +124,7 @@ export function ConversationView({ conversationId, onConversationUpdated }: Prop
     if (busy) return
     appendMsg('user', text)
     setBusy(true)
+    onConvStatusChange(conversationId, { busy: true })
     await window.api.agentSend({ conversationId, text })
   }
 

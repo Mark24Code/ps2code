@@ -11,12 +11,14 @@ import {
   SettingOutlined
 } from '@ant-design/icons'
 import type { Conversation, Project } from '@shared/types'
+import type { ConvStatus } from '../AppShell'
 import { relativeTime } from '../utils/time'
 
 export interface SidebarProps {
   projects: Project[]
   conversations: Record<number, Conversation[]> // projectId -> 对话
   activeConversationId: string | null
+  convStatus: Record<string, ConvStatus>
   view: 'conversation' | 'settings' | 'welcome'
   onNewChat: () => void
   onOpenSettings: () => void
@@ -31,6 +33,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
     projects,
     conversations,
     activeConversationId,
+    convStatus,
     view,
     onNewChat,
     onOpenSettings,
@@ -128,18 +131,23 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                 />
               </div>
               {open &&
-                convs.map((c) => (
-                  <div
-                    key={c.id}
-                    className={`conv-row ${
-                      view === 'conversation' && activeConversationId === c.id ? 'active' : ''
-                    }`}
-                    onClick={() => onSelectConversation(c)}
-                  >
-                    <span className="conv-title" title={c.title}>
-                      {c.title}
-                    </span>
-                    <span className="conv-time">{relativeTime(c.updatedAt)}</span>
+                convs.map((c) => {
+                  const isActive = view === 'conversation' && activeConversationId === c.id
+                  const st = convStatus[c.id]
+                  const showBusyDot = !isActive && st?.busy
+                  const showUnreadDot = !isActive && !st?.busy && st?.unread
+                  return (
+                    <div
+                      key={c.id}
+                      className={`conv-row ${isActive ? 'active' : ''}`}
+                      onClick={() => onSelectConversation(c)}
+                    >
+                      <span className="conv-title" title={c.title}>
+                        {c.title}
+                      </span>
+                      {showBusyDot && <span className="conv-dot conv-dot-busy" title="进行中" />}
+                      {showUnreadDot && <span className="conv-dot conv-dot-unread" title="有新结果" />}
+                      <span className="conv-time">{relativeTime(c.updatedAt)}</span>
                     <DeleteOutlined
                       className="conv-delete"
                       onClick={(e) => {
@@ -155,7 +163,8 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                       }}
                     />
                   </div>
-                ))}
+                  )
+                })}
               {open && convs.length === 0 && (
                 <div className="conv-empty">暂无对话,点右侧 ✎ 新建</div>
               )}

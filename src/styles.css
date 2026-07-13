@@ -185,6 +185,27 @@ body {
 .conv-row .conv-delete:hover {
   color: #ff4d4f;
 }
+
+/* 对话状态指示点 */
+.conv-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.conv-dot-busy {
+  background: #52c41a;
+  animation: conv-dot-breathe 1.4s ease-in-out infinite;
+}
+.conv-dot-unread {
+  background: #fa8c16;
+}
+
+@keyframes conv-dot-breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.7); }
+}
+
 .conv-empty {
   padding: 6px 10px 6px 30px;
   font-size: 12px;
