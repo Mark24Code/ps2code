@@ -18,6 +18,7 @@ export interface PhotoshopBridge {
   detect(): Promise<PsInfo | null>
   runJsx(jsxSource: string): Promise<string>
   runJsxFile(path: string): Promise<string>
+  activate(): Promise<void>
 }
 
 // ---------------- macOS ----------------
@@ -71,6 +72,12 @@ class MacBridge implements PhotoshopBridge {
     return info.app
   }
 
+  async activate(): Promise<void> {
+    const appName = await this.appName()
+    const { stdout } = await execAsync(`osascript -e 'tell application "${appName}" to activate'`)
+    stdout
+  }
+
   async runJsxFile(path: string): Promise<string> {
     const appName = await this.appName()
     // 不使用 activate:让 PS 在后台执行/打开设计稿,不抢焦点、不切换前台窗口。
@@ -115,6 +122,14 @@ class WinBridge implements PhotoshopBridge {
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
+  }
+
+  async activate(): Promise<void> {
+    // 通过 COM 激活 PS 主窗口
+    await this.runPowerShell(
+      `$a = New-Object -ComObject Photoshop.Application
+$a.Activate()`
+    )
   }
 
   async detect(): Promise<PsInfo | null> {

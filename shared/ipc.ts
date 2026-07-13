@@ -36,6 +36,7 @@ export const IPC = {
   psDetect: 'ps:detect',
   psTest: 'ps:test',
   psOpenDesign: 'ps:openDesign',
+  psActivate: 'ps:activate',
 
   // Agent
   agentSend: 'agent:send',

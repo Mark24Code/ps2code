@@ -85,6 +85,9 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.psDetect, () => getBridge().detect())
   ipcMain.handle(IPC.psTest, () => testConnection())
   ipcMain.handle(IPC.psOpenDesign, (_e, psdPath: string) => ensureDesignReady(psdPath))
+  ipcMain.handle(IPC.psActivate, async () => {
+    await getBridge().activate()
+  })
 
   // ---------- Agent ----------
   ipcMain.handle(

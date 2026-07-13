@@ -15,6 +15,7 @@ interface Props {
   busy: boolean
   disabled?: boolean
   designName?: string
+  psdPath?: string
   readyState?: 'idle' | 'loading' | 'ok' | 'error'
   readyMessage?: string
   onSend: (text: string) => void
@@ -25,7 +26,7 @@ interface Props {
 // 对话框上方:设计稿别针标识 + PS 就绪状态。
 // 下方:导出设置(分行展示,不挤一排)。最后是输入框。
 export function Composer(props: Props): JSX.Element {
-  const { conversation, busy, disabled, designName, readyState, readyMessage, onSend, onStop, onUpdate } =
+  const { conversation, busy, disabled, designName, psdPath, readyState, readyMessage, onSend, onStop, onUpdate } =
     props
   const { message } = App.useApp()
   const [text, setText] = useState('')
@@ -78,9 +79,22 @@ export function Composer(props: Props): JSX.Element {
     <div className="composer">
       {/* 设计稿别针 + PS 就绪状态 */}
       <div className="composer-footer">
-        <Tag icon={<PaperClipOutlined />} color="blue" variant="filled" className="design-pin">
-          {designName ?? '设计稿'}
-        </Tag>
+        <Tooltip title={psdPath ? '打开设计稿' : undefined}>
+          <Tag
+            icon={<PaperClipOutlined />}
+            color="blue"
+            variant="filled"
+            className="design-pin"
+            style={{ cursor: psdPath ? 'pointer' : undefined }}
+            onClick={async () => {
+              if (!psdPath) return
+              await window.api.psOpenDesign(psdPath)
+              window.api.psActivate()
+            }}
+          >
+            {designName ?? '设计稿'}
+          </Tag>
+        </Tooltip>
         {statusIcon}
       </div>
 

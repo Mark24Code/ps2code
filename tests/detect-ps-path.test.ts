@@ -31,7 +31,8 @@ function fakeBridge(info: Info): PhotoshopBridge {
     },
     async runJsxFile() {
       return ''
-    }
+    },
+    async activate() {}
   }
 }
 

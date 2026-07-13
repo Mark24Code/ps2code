@@ -18,6 +18,7 @@ class FakeBridge implements PhotoshopBridge {
   async runJsxFile(): Promise<string> {
     return this.reply
   }
+  async activate(): Promise<void> {}
 }
 
 let fake: FakeBridge

@@ -291,6 +291,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
           busy={busy}
           disabled={gateDisabled}
           designName={project.name}
+          psdPath={project.psdPath}
           readyState={ready.state}
           readyMessage={ready.message}
           onSend={send}

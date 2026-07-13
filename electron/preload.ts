@@ -58,6 +58,7 @@ const api = {
     psdPath: string
   ): Promise<{ ok: boolean; message: string; docName?: string }> =>
     ipcRenderer.invoke(IPC.psOpenDesign, psdPath),
+  psActivate: (): Promise<void> => ipcRenderer.invoke(IPC.psActivate),
 
   // Agent
   agentSend: (payload: {
