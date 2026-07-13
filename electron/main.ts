@@ -4,8 +4,19 @@ import { registerIpc } from './ipc'
 import { initDatabase } from './services/db'
 import { detectAndPersistPsPath } from './services/photoshop'
 import { IPC } from '../shared/ipc'
+import { existsSync } from 'fs'
 
 let mainWindow: BrowserWindow | null = null
+
+function getIconPath(): string {
+  // dist 模式: resources 目录在 app 旁
+  const distIcon = join(__dirname, '../../build/icon.png')
+  if (existsSync(distIcon)) return distIcon
+  // dev 模式: 相对于项目根目录
+  const devIcon = join(app.getAppPath(), 'build/icon.png')
+  if (existsSync(devIcon)) return devIcon
+  return ''
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -16,6 +27,7 @@ function createWindow(): void {
     fullscreenable: false,
     show: false,
     autoHideMenuBar: true,
+    icon: getIconPath(),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     backgroundColor: '#f5f6f8',
     webPreferences: {
