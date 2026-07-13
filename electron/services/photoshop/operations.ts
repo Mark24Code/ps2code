@@ -82,6 +82,7 @@ export interface ExportParams {
   targetPath: string
   pattern?: string
   names?: string[]
+  parent?: string  // 限定搜索范围:只在指定父组下查找
   x1: boolean
   x2: boolean
   trim: boolean
@@ -139,6 +140,7 @@ async function exportGroupsViaShell(
   if (params.x1) args.push('--1x')
   if (params.x2) args.push('--2x')
   if (params.trim) args.push('--trim')
+  if (params.parent) args.push(`--parent "${params.parent}"`)
 
   const cmd = `bash "${scriptPath}" ${args.join(' ')}`
   try {

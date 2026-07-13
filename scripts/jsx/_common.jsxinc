@@ -75,6 +75,53 @@ PS2.findAllLayerSets = function (container) {
     return result;
 };
 
+// 在指定父组下递归查找所有匹配名称的 LayerSet
+// container: 起始容器（通常是 doc）
+// parentName: 父组名称（可选，不传则全局搜索）
+// targetName: 目标组名称
+PS2.findGroupsInParent = function (container, parentName, targetName) {
+    var result = [];
+    if (!parentName) {
+        // 无 parentName 时退化为全局查找（兼容旧行为）
+        var all = PS2.findAllLayerSets(container);
+        for (var i = 0; i < all.length; i++) {
+            if (all[i].name === targetName) result.push(all[i]);
+        }
+        return result;
+    }
+    // 先找到父组
+    var parent = PS2.findParentRecursive(container, parentName);
+    if (!parent) return result;
+    // 在父组内递归查找所有匹配 targetName 的子组
+    return PS2.findAllChildSetsByName(parent, targetName);
+};
+
+// 递归查找第一个匹配名称的 LayerSet（深度优先）
+PS2.findParentRecursive = function (container, name) {
+    for (var i = 0; i < container.layers.length; i++) {
+        var l = container.layers[i];
+        if (l.typename === "LayerSet" && l.name === name) return l;
+        if (l.typename === "LayerSet") {
+            var r = PS2.findParentRecursive(l, name);
+            if (r) return r;
+        }
+    }
+    return null;
+};
+
+// 在容器内递归查找所有匹配名称的子 LayerSet
+PS2.findAllChildSetsByName = function (container, name) {
+    var result = [];
+    for (var i = 0; i < container.layers.length; i++) {
+        var l = container.layers[i];
+        if (l.typename === "LayerSet") {
+            if (l.name === name) result.push(l);
+            result = result.concat(PS2.findAllChildSetsByName(l, name));
+        }
+    }
+    return result;
+};
+
 // 解析 Bridge 注入的参数
 PS2.params = function () {
     if (typeof PS2CODE_PARAMS === "undefined") return {};

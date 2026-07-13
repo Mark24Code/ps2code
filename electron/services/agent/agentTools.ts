@@ -1,6 +1,7 @@
 import type { AgentStreamEvent } from '../../../shared/types'
 import { getConversation } from '../db'
 import { readPsdMeta } from '../psd'
+import type { PsdLayerNode } from '../../../shared/types'
 import {
   exportGroups,
   mutateLayers,
@@ -32,18 +33,22 @@ export function createToolHandlers(deps: ToolDeps) {
   return {
     async listLayers(args: { pattern?: string }): Promise<ToolResult> {
       const meta = await readPsdMeta(targetPath)
-      const names: string[] = []
-      const walk = (nodes: typeof meta.tree): void => {
-        for (const n of nodes) {
-          if (n.kind === 'group') {
-            if (!args.pattern || new RegExp(args.pattern).test(n.name)) names.push(n.name)
+      // 返回完整层级树（含 id、name、kind、hidden、children），
+      // 让 AI 能理解图层层级关系，通过 parent 参数精确定位导出范围
+      const simplifyTree = (nodes: PsdLayerNode[]): unknown[] => {
+        return nodes.map(n => {
+          const node: Record<string, unknown> = {
+            id: n.id,
+            name: n.name,
+            kind: n.kind,
+            hidden: n.hidden
           }
-          if (n.children) walk(n.children)
-        }
+          if (n.children) node.children = simplifyTree(n.children)
+          return node
+        })
       }
-      walk(meta.tree)
-      emit({ type: 'tool_result', name: 'list_layers', text: `匹配 ${names.length} 个组` })
-      return { content: [{ type: 'text', text: JSON.stringify({ groups: names }) }] }
+      const tree = simplifyTree(meta.tree)
+      return { content: [{ type: 'text', text: JSON.stringify({ tree }) }] }
     },
 
     async renameGroups(args: { rules: RenameRule[] }): Promise<ToolResult> {
@@ -71,12 +76,13 @@ export function createToolHandlers(deps: ToolDeps) {
       return { content: [{ type: 'text', text: JSON.stringify(res.data) }], isError: !res.ok }
     },
 
-    async exportGroups(args: { pattern?: string; names?: string[] }): Promise<ToolResult> {
+    async exportGroups(args: { pattern?: string; names?: string[]; parent?: string }): Promise<ToolResult> {
       const cur = getConversation(conversationId)!
       const res = await exportGroups({
         targetPath,
         pattern: args.pattern ?? '',
         names: args.names ?? [],
+        parent: args.parent,
         x1: cur.opt1x,
         x2: cur.opt2x,
         trim: cur.optTrim,

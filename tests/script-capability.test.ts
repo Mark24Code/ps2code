@@ -137,8 +137,8 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     // 回退函数 exportOneGroupFallback 也应使用 exportLayerToFile
     expect(fake.lastScript).toContain('exportLayerToFile')
     // exportOneGroupFallback 内应包含 exportLayerToFile 调用
-    expect(fake.lastScript).toContain('exportLayerToFile(tempDoc, exportDir.fsName + "/" + outName)')
-    expect(fake.lastScript).toContain('exportLayerToFile(tempDoc, exportDir.fsName + "/" + outName + "@2x")')
+    expect(fake.lastScript).toContain('exportLayerToFile(tempDoc, exportDir.fsName + "/" + uniqueName)')
+    expect(fake.lastScript).toContain('exportLayerToFile(tempDoc, exportDir.fsName + "/" + uniqueName + "@2x")')
     // 不应包含旧的硬编码 exportPNG 函数名
     expect(fake.lastScript).not.toContain('exportAsTIFF')
   })

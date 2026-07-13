@@ -97,8 +97,8 @@ export async function runAgent(
     tools: [
       tool(
         'list_layers',
-        '读取并返回当前设计稿的图层组结构,可用正则过滤组名',
-        { pattern: z.string().optional().describe('可选,用于过滤组名的正则表达式') },
+        '读取并返回当前设计稿的完整图层组层级树(含 id/name/kind/hidden/children)。可用正则过滤组名(不传则返回全部)。',
+        { pattern: z.string().optional().describe('可选,用于过滤组名的正则表达式,不传则返回完整树') },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (args) => handlers.listLayers(args) as any
       ),
@@ -122,10 +122,11 @@ export async function runAgent(
       ),
       tool(
         'export_groups',
-        '导出匹配的图层组为 PNG 到本对话临时目录用于预览。倍率与裁剪默认取对话设置。',
+        '导出匹配的图层组为 PNG 到本对话临时目录用于预览。倍率与裁剪默认取对话设置。支持 parent 参数限定在指定父组下搜索。',
         {
           pattern: z.string().optional().describe('匹配组名的正则'),
-          names: z.array(z.string()).optional().describe('明确的组名列表')
+          names: z.array(z.string()).optional().describe('明确的组名列表'),
+          parent: z.string().optional().describe('限定搜索范围:只在指定父组名下的子组中查找(不同父组下有同名字组时用于区分)')
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (args) => handlers.exportGroups(args) as any
@@ -135,7 +136,19 @@ export async function runAgent(
 
   const systemPrompt = `你是 PS2Code 的设计稿助手。用户已锁定设计稿: ${targetPath}。
 你的职责是理解用户意图,并调用本地工具完成图层的查询/重命名/增删改/图层导出图片。
-不要臆造图层名;不确定时先用 list_layers 查询,先搜索再决定，图层名字可能会出现重复，可以通过id、名字、尺寸、坐标位置区别不同图层。写、破坏性操作(删除)会由系统弹出确认，如果检查有多个同名元素，导出的时候，为了避免同名覆盖，需要给导出文件名字添加递增数字后缀，比如_01,_02依此类推，确保导出的时候不会丢失。
+不要臆造图层名;不确定时先用 list_layers 查看完整层级树。
+图层名字可能会出现重复(例如"x默认"和"已签"下都有1~7)，可以用 export_groups 的 parent 参数指定父组来区分范围。
+
+【导出前确认流程】
+导出图片前，必须先用 list_layers 搜索定位目标图层，把完整路径、bounds坐标、尺寸整理后，向用户列出即将导出的图层清单并请求确认。用户确认后才能调用 export_groups 执行导出。
+
+【导出文件命名规则】
+导出的文件名以图层树中最末位(叶子)图层/组的名字为准。如果导出了多个同名的组，文件会自动添加 _01,_02 等后缀。
+
+【防覆盖】
+每次导出前，先检查输出目录中是否已存在同名 .png(或 @2x.png) 文件。如果已有，自动跳过已存在的序号，分配下一个可用序号，确保绝不覆盖已有文件。
+
+破坏性操作(删除)会由系统弹出确认。
 当前设计稿信息:\n${layerSummary}`
 
   const abort = new AbortController()
