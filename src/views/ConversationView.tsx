@@ -9,6 +9,7 @@ import type {
   Conversation,
   Message,
   Project,
+  VersionDiffLine,
   VersionDiffResult,
   VersionSnapshot
 } from '@shared/types'
@@ -43,7 +44,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
   const [ready, setReady] = useState<Ready>({ state: 'idle' })
   const [logOpen, setLogOpen] = useState(false)
   const [logs, setLogs] = useState<{ ts: number; level: string; message: string }[]>([])
-  const [rightTab, setRightTab] = useState<'preview' | 'layers' | 'diff'>('preview')
+  const [rightTab, setRightTab] = useState<'preview' | 'layers' | 'diff' | 'report'>('preview')
   const msgEndRef = useRef<HTMLDivElement>(null)
 
   // 版本管理
@@ -260,7 +261,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
   const enterDiffMode = useCallback((baseVersion: number) => {
     if (!project) return
     loadDiff(project.id, baseVersion)
-    setRightTab('diff')
+    setRightTab('report') // 选中版本后默认先看报告
   }, [project, loadDiff])
 
   const exitDiffMode = useCallback(() => {
@@ -272,6 +273,129 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
   if (!conv || !project) return <Spin style={{ margin: 'auto' }} />
 
   /* ---- Diff 内容渲染 ---- */
+  interface LayerDetail { name: string; depth: number; changes: string[] }
+  interface DiffSummary { added: LayerDetail[]; deleted: LayerDetail[]; modified: LayerDetail[] }
+
+  function parseTextDepth(text: string): number {
+    const m = text.match(/^(\s*)/)
+    return m ? Math.floor(m[1].length / 2) : 0
+  }
+
+  function parseDiffLayers(lines: VersionDiffLine[]): DiffSummary {
+    const added: LayerDetail[] = []
+    const deleted: LayerDetail[] = []
+    const modified: LayerDetail[] = []
+    let currentLayer = ''
+    let currentDepth = 0
+    let layerSide: 'add' | 'del' | 'mod' = 'mod'
+    let currentChanges: string[] = []
+
+    function parseChange(left: string | null, right: string | null): string | null {
+      const text = left || right || ''
+      const trimmed = text.trim()
+      if (!trimmed || trimmed.startsWith('◈')) return null
+      const parts = trimmed.split('=')
+      const attr = parts[0].trim()
+      if (!attr) return null
+      if (left && right) {
+        const ov = left.split('=').slice(1).join('=').trim()
+        const nv = right.split('=').slice(1).join('=').trim()
+        return `${attr}: ${ov} → ${nv}`
+      } else if (left) {
+        return `${attr}: ${left.split('=').slice(1).join('=').trim()}（已删除）`
+      } else if (right) {
+        return `${attr}: ${right.split('=').slice(1).join('=').trim()}（新增）`
+      }
+      return null
+    }
+
+    for (const line of lines) {
+      const text = line.left ?? line.right ?? ''
+      if (text.startsWith('◈')) {
+        if (currentLayer) {
+          const detail: LayerDetail = { name: currentLayer, depth: currentDepth, changes: [...currentChanges] }
+          if (layerSide === 'add') added.push(detail)
+          else if (layerSide === 'del') deleted.push(detail)
+          else if (currentChanges.length) modified.push(detail)
+        }
+        currentLayer = text.replace(/^◈\s+/, '').replace(/\s+\(.*\)$/, '')
+        currentDepth = parseTextDepth(text)
+        currentChanges = []
+        layerSide = 'mod'
+        if (line.type === 'chg') {
+          if (line.left && !line.right) layerSide = 'del'
+          else if (!line.left && line.right) layerSide = 'add'
+        }
+      } else if (line.type === 'chg' && currentLayer) {
+        const ch = parseChange(line.left, line.right)
+        if (ch) currentChanges.push(ch)
+      }
+    }
+    if (currentLayer) {
+      const detail: LayerDetail = { name: currentLayer, depth: currentDepth, changes: [...currentChanges] }
+      if (layerSide === 'add') added.push(detail)
+      else if (layerSide === 'del') deleted.push(detail)
+      else if (currentChanges.length) modified.push(detail)
+    }
+    return { added, deleted, modified }
+  }
+
+  function renderLayerTree(items: LayerDetail[], cssClass: string, connector: string): JSX.Element {
+    if (items.length === 0) return <div className="report-empty">无</div>
+    return (
+      <ul className="report-tree">
+        {items.map((n, i) => (
+          <li key={i} className={`report-tree-item ${cssClass}`} style={{ paddingLeft: n.depth * 20 + 8 }}>
+            <span className="report-tree-connector">{'│'.repeat(Math.max(0, n.depth))}{n.depth > 0 ? ' ' : ''}</span>
+            <span className="report-tree-name">{n.name}</span>
+            {n.changes.length > 0 && (
+              <div className="report-tree-attrs">
+                {n.changes.map((c, ci) => (
+                  <div key={ci} className="report-tree-attr">{c}</div>
+                ))}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  function renderReportContent(): JSX.Element {
+    if (diffLoading) {
+      return <Spin style={{ display: 'block', margin: '48px auto' }} />
+    }
+    if (!diffData) {
+      return <Empty description="无差异数据" style={{ marginTop: 48 }} />
+    }
+    const layerSummary = parseDiffLayers(diffData.lines)
+    return (
+      <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
+        <div className="report-section">
+          <div className="report-title">
+            <span className="report-icon report-icon-add" />
+            新增 · 共 {layerSummary.added.length} 个图层
+          </div>
+          {renderLayerTree(layerSummary.added, 'add', '+')}
+        </div>
+        <div className="report-section">
+          <div className="report-title">
+            <span className="report-icon report-icon-del" />
+            删除 · 共 {layerSummary.deleted.length} 个图层
+          </div>
+          {renderLayerTree(layerSummary.deleted, 'del', '−')}
+        </div>
+        <div className="report-section">
+          <div className="report-title">
+            <span className="report-icon report-icon-mod" />
+            修改 · 共 {layerSummary.modified.length} 个图层
+          </div>
+          {renderLayerTree(layerSummary.modified, 'mod', '~')}
+        </div>
+      </div>
+    )
+  }
+
   function renderDiffContent(): JSX.Element {
     if (diffLoading) {
       return <Spin style={{ display: 'block', margin: '48px auto' }} />
@@ -280,9 +404,15 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
       return <Empty description="加载差异数据失败" style={{ marginTop: 48 }} />
     }
     const { lines, summary, baseVersion, targetVersion } = diffData
+
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {/* 列头 */}
         <div className="diff-header">
+          <svg className="diff-header-icon" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="1.5" y="3" width="7" height="14" rx="1" />
+            <rect x="11.5" y="3" width="7" height="14" rx="1" />
+          </svg>
           <span className="diff-header-left">v{baseVersion}</span>
           <span className="diff-header-arrow">→</span>
           <span className="diff-header-right">v{targetVersion}（最新）</span>
@@ -292,27 +422,65 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
             <span className="diff-count-mod">~{summary.mod}</span>
           </span>
         </div>
-        <div className="diff-scroll">
-          <table className="diff-table">
-            <tbody>
-              {lines.map((line, i) => {
-                const lCls = line.type === 'chg' && line.left ? 'l-del' : ''
-                const rCls = line.type === 'chg' && line.right ? 'r-add' : ''
-                const lEmpty = !line.left ? 'empty' : ''
-                const rEmpty = !line.right ? 'empty' : ''
-                return (
-                  <tr key={i}>
-                    <td className={`${lCls} ${lEmpty}`}>
-                      {line.left ?? ''}
-                    </td>
-                    <td className={`${rCls} ${rEmpty}`}>
-                      {line.right ?? ''}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+
+        {/* Diff 表格 + Minimap 标尺 */}
+        <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+          <div
+            className="diff-scroll"
+            ref={(el) => { (window as any).__diffScroll = el }}
+            onScroll={() => {
+              const el = (window as any).__diffScroll as HTMLElement | null
+              const vp = (window as any).__diffViewport as HTMLElement | null
+              if (!el || !vp) return
+              const sh = el.scrollHeight - el.clientHeight
+              const rh = el.clientHeight - vp.offsetHeight
+              vp.style.top = sh > 0 ? `${(el.scrollTop / sh) * rh}px` : '0px'
+            }}
+          >
+            <table className="diff-table">
+              <tbody>
+                {lines.map((line, i) => {
+                  const isMod = line.type === 'chg' && line.left && line.right
+                  const isDel = line.type === 'chg' && line.left && !line.right
+                  const isAdd = line.type === 'chg' && !line.left && line.right
+                  let lCls = ''
+                  let rCls = ''
+                  if (isDel) { lCls = 'l-del'; rCls = 'empty' }
+                  else if (isAdd) { lCls = 'empty'; rCls = 'r-add' }
+                  else if (isMod) { lCls = 'l-mod'; rCls = 'r-mod' }
+                  return (
+                    <tr key={i} data-diff-row={i}>
+                      <td className={lCls}>{line.left ?? ''}</td>
+                      <td className={rCls}>{line.right ?? ''}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {/* Minimap 标尺:红/绿/橙色块 + 视口指示器,点击跳转行 */}
+          <div className="diff-ruler" ref={(el) => { (window as any).__diffRuler = el }}>
+            <div className="diff-ruler-viewport" ref={(el) => { (window as any).__diffViewport = el }} />
+            {lines.map((line, i) => {
+              const isMod = line.type === 'chg' && line.left && line.right
+              const isDel = line.type === 'chg' && line.left && !line.right
+              const isAdd = line.type === 'chg' && !line.left && line.right
+              const color = isDel ? '#dc2626' : isAdd ? '#16a34a' : isMod ? '#d97706' : 'transparent'
+              return (
+                <div
+                  key={i}
+                  className="diff-ruler-line"
+                  style={{ background: color }}
+                  onClick={() => {
+                    const container = (window as any).__diffScroll as HTMLDivElement | null
+                    if (!container) return
+                    const row = container.querySelector(`[data-diff-row="${i}"]`)
+                    if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' })
+                  }}
+                />
+              )
+            })}
+          </div>
         </div>
       </div>
     )
@@ -478,7 +646,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
             [
               ['preview', '导出预览'],
               ['layers', '图层结构'],
-              ...(diffBaseVersion !== null ? [['diff', 'Diff']] : [])
+              ...(diffBaseVersion !== null ? [['diff', '图层 Diff'], ['report', 'Diff 报告']] : [])
             ]
           ).map(([key, label]) => (
             <div
@@ -492,7 +660,10 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
                 color: rightTab === key ? 'var(--brand)' : 'var(--text-2)',
                 borderBottom: rightTab === key ? '2px solid var(--brand)' : '2px solid transparent',
                 transition: 'color .15s, border-color .15s',
-                userSelect: 'none'
+                userSelect: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6
               }}
             >
               {label}
@@ -513,6 +684,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
             </div>
           )}
           {rightTab === 'diff' && renderDiffContent()}
+          {rightTab === 'report' && renderReportContent()}
         </div>
       </div>
 

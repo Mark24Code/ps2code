@@ -880,3 +880,184 @@ body {
 .diff-table td.empty {
   background: #fcfcfc;
 }
+.diff-table td.l-mod {
+  background: #fef3c7;
+  color: #92400e;
+}
+.diff-table td.r-mod {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* 报告 tab 样式 */
+.report-section {
+  margin-bottom: 20px;
+}
+.report-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.report-icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.report-icon-add { background: var(--ok); }
+.report-icon-del { background: var(--danger); }
+.report-icon-mod { background: #d97706; }
+.report-tree {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.report-tree-item {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-bottom: 1px;
+  position: relative;
+}
+.report-tree-item.add {
+  background: #f0fdf4;
+  color: var(--ok);
+}
+.report-tree-item.del {
+  background: #fef2f2;
+  color: var(--danger);
+  text-decoration: line-through;
+}
+.report-tree-item.mod {
+  background: #fffbeb;
+  color: #92400e;
+  padding: 5px 8px;
+}
+.report-tree-connector {
+  color: #d1d5db;
+  font-size: 11px;
+  margin-right: 4px;
+  letter-spacing: 0;
+}
+.report-tree-name {
+  font-weight: 600;
+}
+.report-tree-attrs {
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.report-tree-attr {
+  font-size: 11px;
+  padding-left: 16px;
+  line-height: 1.8;
+  font-weight: 400;
+  position: relative;
+  opacity: 0.85;
+}
+.report-tree-attr::before {
+  content: "→";
+  position: absolute;
+  left: 2px;
+  color: #d97706;
+  font-weight: 700;
+}
+.report-empty {
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 2px 10px;
+}
+
+/* Diff 汇总面板 */
+.diff-summary {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: #fafafa;
+  flex-shrink: 0;
+}
+.diff-summary-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.diff-summary-section:last-child {
+  margin-bottom: 0;
+}
+.diff-summary-icon {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+.diff-summary-add { background: var(--ok); }
+.diff-summary-del { background: var(--danger); }
+.diff-summary-mod { background: #d97706; }
+.diff-summary-title {
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+  flex-shrink: 0;
+  width: 28px;
+}
+.diff-summary-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+}
+.diff-summary-item {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+.diff-summary-item.add { color: var(--ok); }
+.diff-summary-item.del { color: var(--danger); text-decoration: line-through; }
+.diff-summary-item.mod { color: #92400e; }
+.diff-summary-empty { color: var(--text-3); font-size: 11px; }
+
+.diff-header-icon {
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+/* Diff 右侧 Minimap 标尺 */
+.diff-ruler {
+  width: 20px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: #fafafa;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+}
+.diff-ruler-viewport {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: rgba(100, 116, 139, 0.12);
+  border: 1px solid rgba(100, 116, 139, 0.25);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 2;
+  transition: top .05s linear;
+}
+.diff-ruler-line {
+  flex: 1;
+  min-height: 0;
+  cursor: pointer;
+  transition: opacity .1s;
+}
+.diff-ruler-line:hover {
+  opacity: 0.6;
+}
