@@ -71,11 +71,39 @@ export function renameGroups(
 
 export interface LayerOp {
   action: 'hide' | 'show' | 'delete'
-  name: string
+  name?: string
+  psId?: number
 }
 
 export function mutateLayers(targetPath: string, ops: LayerOp[]): Promise<JsxResult> {
   return runScript('mutate-layers.jsx', { targetPath, ops })
+}
+
+// 修改文字图层内容:psId 优先定位,回退按 name。
+export interface TextEdit {
+  psId?: number
+  name?: string
+  text: string
+}
+
+export function setText(
+  targetPath: string,
+  edits: TextEdit[]
+): Promise<JsxResult<{ edits: { target: string; ok: boolean; reason?: string; before?: string; after?: string }[] }>> {
+  return runScript('set-text.jsx', { targetPath, edits })
+}
+
+// 合并图层组:把匹配的组(psId 优先,回退 name)各自合并为单个图层。
+export interface MergeTarget {
+  psId?: number
+  name?: string
+}
+
+export function mergeGroups(
+  targetPath: string,
+  targets: MergeTarget[]
+): Promise<JsxResult<{ merged: { target: string; ok: boolean; reason?: string }[] }>> {
+  return runScript('merge-groups.jsx', { targetPath, targets })
 }
 
 // 单个导出目标:psId 用于在 PS 中精确定位(缺失则回退按名),

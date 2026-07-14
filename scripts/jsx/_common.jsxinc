@@ -161,6 +161,19 @@ PS2.findAnyByName = function (container, name) {
     return null;
 };
 
+// 统一定位单个图层/组:优先按 PSD 原生 psId 精确选中,失败(缺失/旧版 PS/已删)回退按名查找。
+// target: { psId?, name? }。返回 ArtLayer/LayerSet,或 null。
+PS2.locate = function (doc, target) {
+    if (target && typeof target.psId === "number" && target.psId > 0) {
+        var byId = PS2.selectLayerById(doc, target.psId);
+        if (byId) return byId;
+    }
+    if (target && target.name) {
+        return PS2.findAnyByName(doc, target.name);
+    }
+    return null;
+};
+
 // 解析 Bridge 注入的参数
 PS2.params = function () {
     if (typeof PS2CODE_PARAMS === "undefined") return {};

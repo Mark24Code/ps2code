@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setBridgeForTest, type PhotoshopBridge } from '../electron/services/photoshop'
-import { renameGroups, exportGroups, mutateLayers } from '../electron/services/photoshop/operations'
+import {
+  renameGroups,
+  exportGroups,
+  mutateLayers,
+  setText,
+  mergeGroups
+} from '../electron/services/photoshop/operations'
 
 // 捕获最后一次执行的脚本内容 + 返回可控 JSON 的假 Bridge。
 // 用于在无真实 Photoshop 的情况下验证「脚本能力可执行」的完整链路:
@@ -74,6 +80,51 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     expect(res.ok).toBe(true)
     expect(fake.lastScript).toContain('组5')
     expect(fake.lastScript).toContain('hide')
+  })
+
+  it('mutate_layers 支持 psId 精确定位隐藏任意图层', async () => {
+    fake.reply = JSON.stringify({
+      ok: true,
+      data: { ops: [{ action: 'hide', target: '#84', count: 1 }] },
+      log: ['OK  hide #84 (1 处)'],
+      error: ''
+    })
+    const res = await mutateLayers('/tmp/a.psd', [{ action: 'hide', psId: 84 }])
+    expect(res.ok).toBe(true)
+    // 脚本按 psId 走 selectLayerById,并能收集任意类型图层(collectByName)
+    expect(fake.lastScript).toContain('selectLayerById')
+    expect(fake.lastScript).toContain('collectByName')
+  })
+
+  it('set_text 组装脚本并传递文字修改列表', async () => {
+    fake.reply = JSON.stringify({
+      ok: true,
+      data: { edits: [{ target: '标题', ok: true, before: '旧', after: '新文案' }] },
+      log: ['OK  文字修改: 标题'],
+      error: ''
+    })
+    const res = await setText('/tmp/a.psd', [{ name: '标题', text: '新文案' }])
+    expect(res.ok).toBe(true)
+    expect(res.data.edits[0].after).toBe('新文案')
+    // 脚本含公共库、目标名/新文字,以及文字图层判定
+    expect(fake.lastScript).toContain('新文案')
+    expect(fake.lastScript).toContain('LayerKind.TEXT') // 来自 set-text.jsx
+    expect(fake.lastScript).toContain('textItem.contents')
+  })
+
+  it('merge_groups 组装脚本并传递目标列表', async () => {
+    fake.reply = JSON.stringify({
+      ok: true,
+      data: { merged: [{ target: '组5', ok: true }] },
+      log: ['OK  合并图层组: 组5'],
+      error: ''
+    })
+    const res = await mergeGroups('/tmp/a.psd', [{ name: '组5' }])
+    expect(res.ok).toBe(true)
+    expect(res.data.merged[0].ok).toBe(true)
+    expect(fake.lastScript).toContain('组5')
+    expect(fake.lastScript).toContain('.merge()') // 来自 merge-groups.jsx
+    expect(fake.lastScript).toContain('LayerSet') // 判定为图层组
   })
 
   it('脚本返回非 JSON 时安全兜底', async () => {

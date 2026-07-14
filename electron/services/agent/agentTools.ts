@@ -6,8 +6,12 @@ import {
   exportGroups,
   mutateLayers,
   renameGroups,
+  setText,
+  mergeGroups,
   type RenameRule,
-  type LayerOp
+  type LayerOp,
+  type TextEdit,
+  type MergeTarget
 } from '../photoshop/operations'
 
 // 一条搜索命中结果:收集图层名链路径与 psd 原生 id,供确认与导出使用。
@@ -187,6 +191,30 @@ export function createToolHandlers(deps: ToolDeps) {
       }
       const res = await mutateLayers(targetPath, args.ops)
       emit({ type: 'tool_result', name: 'mutate_layers', text: res.log.join('\n') })
+      return { content: [{ type: 'text', text: JSON.stringify(res.data) }], isError: !res.ok }
+    },
+
+    // 修改文字图层内容。改动设计稿,需用户同意(由 Agent 在对话中确认后调用)。
+    async setText(args: { edits: TextEdit[] }): Promise<ToolResult> {
+      const res = await setText(targetPath, args.edits)
+      emit({ type: 'tool_result', name: 'set_text', text: res.log.join('\n') })
+      return { content: [{ type: 'text', text: JSON.stringify(res.data) }], isError: !res.ok }
+    },
+
+    // 合并图层组为单个图层。不可逆(组内结构丢失),先请求用户确认。
+    async mergeGroups(args: { targets: MergeTarget[] }): Promise<ToolResult> {
+      const label = args.targets
+        .map((t) => t.name ?? `#${t.psId}`)
+        .join(', ')
+      const approved = await confirm(
+        `即将合并图层组: ${label}。合并后组内图层会被压平为单个图层且不可撤销,并会保存文件,是否继续?`,
+        args.targets
+      )
+      if (!approved) {
+        return { content: [{ type: 'text', text: '用户取消了合并操作' }] }
+      }
+      const res = await mergeGroups(targetPath, args.targets)
+      emit({ type: 'tool_result', name: 'merge_groups', text: res.log.join('\n') })
       return { content: [{ type: 'text', text: JSON.stringify(res.data) }], isError: !res.ok }
     },
 

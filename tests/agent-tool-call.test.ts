@@ -145,6 +145,75 @@ describe('Agent 对话可调用脚本', () => {
     expect(data._log.some((l: string) => l.includes('失败') || l.includes('Error'))).toBe(true)
   })
 
+  it('set_text 工具调用触达脚本并回传 tool_result 事件', async () => {
+    const project = importProject('/tmp/t.psd', 't')
+    const conv = createConversation(project.id, '/tmp/tmpt', '/tmp/outt')
+
+    fake.reply = JSON.stringify({
+      ok: true,
+      data: { edits: [{ target: '标题', ok: true, before: '旧', after: '新文案' }] },
+      log: ['OK  文字修改: 标题'],
+      error: ''
+    })
+
+    const events: AgentStreamEvent[] = []
+    const handlers = createToolHandlers({
+      targetPath: project.psdPath,
+      conversationId: conv.id,
+      emit: (e) => events.push(e)
+    })
+
+    const res = await handlers.setText({ edits: [{ name: '标题', text: '新文案' }] })
+    expect(res.isError).toBeFalsy()
+    expect(fake.lastScript).toContain('新文案')
+    expect(fake.lastScript).toContain('textItem.contents')
+    expect(events.some((e) => e.type === 'tool_result' && e.name === 'set_text')).toBe(true)
+  })
+
+  it('merge_groups 会请求确认;拒绝则不执行脚本', async () => {
+    const project = importProject('/tmp/m.psd', 'm')
+    const conv = createConversation(project.id, '/tmp/tmpm', '/tmp/outm')
+
+    const confirm = vi.fn(async () => false) // 用户拒绝
+    const handlers = createToolHandlers({
+      targetPath: project.psdPath,
+      conversationId: conv.id,
+      emit: () => {},
+      requestConfirm: confirm
+    })
+
+    fake.lastScript = ''
+    const res = await handlers.mergeGroups({ targets: [{ name: '组9' }] })
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(fake.lastScript).toBe('') // 拒绝后未执行任何脚本
+    expect(res.content[0].text).toContain('取消')
+  })
+
+  it('merge_groups 确认后执行脚本并回传事件', async () => {
+    const project = importProject('/tmp/m2.psd', 'm2')
+    const conv = createConversation(project.id, '/tmp/tmpm2', '/tmp/outm2')
+
+    fake.reply = JSON.stringify({
+      ok: true,
+      data: { merged: [{ target: '组9', ok: true }] },
+      log: ['OK  合并图层组: 组9'],
+      error: ''
+    })
+
+    const events: AgentStreamEvent[] = []
+    const handlers = createToolHandlers({
+      targetPath: project.psdPath,
+      conversationId: conv.id,
+      emit: (e) => events.push(e),
+      requestConfirm: async () => true
+    })
+
+    const res = await handlers.mergeGroups({ targets: [{ name: '组9' }] })
+    expect(res.isError).toBeFalsy()
+    expect(fake.lastScript).toContain('.merge()')
+    expect(events.some((e) => e.type === 'tool_result' && e.name === 'merge_groups')).toBe(true)
+  })
+
   it('export_groups 部分成功部分失败:综合工具返回', async () => {
     const project = importProject('/tmp/f.psd', 'f')
     const conv = createConversation(project.id, '/tmp/partial', '/tmp/out')
