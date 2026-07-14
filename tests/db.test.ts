@@ -38,6 +38,7 @@ describe('对话与默认导出选项(SPEC:默认二倍图/裁剪)', () => {
     expect(c.opt2x).toBe(true)
     expect(c.opt1x).toBe(false)
     expect(c.optTrim).toBe(true)
+    expect(c.optCompress).toBe(true)
     expect(c.title).toBe('新对话')
   })
 

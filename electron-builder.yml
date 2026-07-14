@@ -18,6 +18,9 @@ extraResources:
     to: scripts/lib/detect-ps.sh
 asarUnpack:
   - '**/node_modules/better-sqlite3/**'
+  # sharp(libvips)原生库:含 .node 与平台二进制,必须解包到 asar 外才能加载
+  - '**/node_modules/sharp/**'
+  - '**/node_modules/@img/**'
 mac:
   target:
     - dmg

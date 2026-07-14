@@ -123,6 +123,7 @@ export interface ExportParams {
   x1: boolean
   x2: boolean
   trim: boolean
+  compress: boolean
   outputDir: string
 }
 
@@ -277,13 +278,15 @@ async function exportGroupsViaJsx(
 }
 
 // 对外入口:接收 agentTools 收集的 targets(含 path/id/psId),
-// 在此计算 exportName(叶子名_节点id),再交给平台对应的脚本执行。
-export function exportGroups(params: {
+// 在此计算 exportName(叶子名_节点id),交给平台脚本导出,
+// 然后按选项对导出的 PNG 跑「后处理流水线」(顺序:裁剪→压缩;裁剪已在 PS 完成,此处主要做无损压缩)。
+export async function exportGroups(params: {
   targetPath: string
   targets: RawExportTarget[]
   x1: boolean
   x2: boolean
   trim: boolean
+  compress: boolean
   outputDir: string
 }): Promise<JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>> {
   const resolved: ExportParams = {
@@ -292,16 +295,34 @@ export function exportGroups(params: {
     x1: params.x1,
     x2: params.x2,
     trim: params.trim,
+    compress: params.compress,
     outputDir: params.outputDir
   }
-  // 测试模式:走 JSX 路径(通过 FakeBridge,不依赖真实 Photoshop / shell)
+
+  // 1) 平台导出
+  let res: JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>
   if (isUsingTestBridge()) {
-    return exportGroupsViaJsx(resolved)
+    // 测试模式:走 JSX 路径(通过 FakeBridge,不依赖真实 Photoshop / shell)
+    res = await exportGroupsViaJsx(resolved)
+  } else if (process.platform === 'darwin') {
+    res = await exportGroupsViaShell(resolved)
+  } else {
+    res = await exportGroupsViaJsx(resolved)
   }
-  if (process.platform === 'darwin') {
-    return exportGroupsViaShell(resolved)
+
+  // 2) 后处理流水线:仅在导出成功、勾选压缩、且测试模式外执行(避免测试依赖 sharp 原生库)。
+  if (res.ok && params.compress && res.data.files && res.data.files.length > 0 && !isUsingTestBridge()) {
+    try {
+      const { runPipeline } = await import('../image/pipeline')
+      const pipe = await runPipeline(res.data.files, { trim: params.trim, compress: params.compress })
+      res.log = res.log.concat(pipe.log)
+    } catch (e) {
+      // 后处理失败不影响导出产物本身,仅记录日志。
+      res.log = res.log.concat([`后处理流水线失败(不影响已导出文件): ${(e as Error).message}`])
+    }
   }
-  return exportGroupsViaJsx(resolved)
+
+  return res
 }
 
 // 无害测试:返回 PS 版本

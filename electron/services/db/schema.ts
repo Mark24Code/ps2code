@@ -21,6 +21,7 @@ export function createSchema(db: Database.Database): void {
       opt_trim INTEGER NOT NULL DEFAULT 1,
       opt_1x INTEGER NOT NULL DEFAULT 0,
       opt_2x INTEGER NOT NULL DEFAULT 1,
+      opt_compress INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -38,4 +39,20 @@ export function createSchema(db: Database.Database): void {
       value TEXT NOT NULL
     );
   `)
+
+  // 迁移:为既有库补齐新列(CREATE TABLE IF NOT EXISTS 不会给旧表加列)。
+  ensureColumn(db, 'conversations', 'opt_compress', 'INTEGER NOT NULL DEFAULT 1')
+}
+
+// 幂等地为表补齐某列:仅当列不存在时执行 ALTER TABLE。
+function ensureColumn(
+  db: Database.Database,
+  table: string,
+  column: string,
+  definition: string
+): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+  }
 }

@@ -65,6 +65,7 @@ describe('脚本能力可执行(通过 Bridge)', () => {
       x1: false,
       x2: true,
       trim: true,
+      compress: false,
       outputDir: '/out'
     })
     expect(res.ok).toBe(true)
@@ -145,7 +146,7 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     const res = await exportGroups({
       targetPath: '/tmp/a.psd',
       targets: [{ psId: 84, path: '根组/组84', id: '0/0', name: '组84' }],
-      x1: true, x2: false, trim: true, outputDir: '/out'
+      x1: true, x2: false, trim: true, compress: false, outputDir: '/out'
     })
     expect(res.ok).toBe(true)
     expect(fake.lastScript).toContain('exportLayerToFile')
@@ -169,7 +170,7 @@ describe('脚本能力可执行(通过 Bridge)', () => {
         { psId: 1, path: 'first', id: '0', name: 'first' },
         { psId: 2, path: 'second', id: '1', name: 'second' }
       ],
-      x1: true, x2: false, trim: false, outputDir: '/out'
+      x1: true, x2: false, trim: false, compress: false, outputDir: '/out'
     })
     expect(res.data.files.length).toBe(2)
     // 已经是 PNG 则无需转换
@@ -187,7 +188,7 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     await exportGroups({
       targetPath: '/tmp/a.psd',
       targets: [{ psId: 84, path: '根组/组84', id: '0/0', name: '组84' }],
-      x1: true, x2: false, trim: true, outputDir: '/out'
+      x1: true, x2: false, trim: true, compress: false, outputDir: '/out'
     })
     // 回退函数 exportOneGroupFallback 也应使用 exportLayerToFile
     expect(fake.lastScript).toContain('exportLayerToFile')
@@ -208,7 +209,7 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     const res = await exportGroups({
       targetPath: '/tmp/a.psd',
       targets: [{ psId: 84, path: '根组/组84', id: '0/0', name: '组84' }],
-      x1: false, x2: true, trim: false, outputDir: '/out'
+      x1: false, x2: true, trim: false, compress: false, outputDir: '/out'
     })
     expect(res.ok).toBe(true)
     expect(res.data.files[0]).toMatch(/@2x\.png$/)
@@ -228,7 +229,7 @@ describe('脚本能力可执行(通过 Bridge)', () => {
         { psId: 2, path: 'bad1', id: '1', name: 'bad1' },
         { psId: 3, path: 'bad2', id: '2', name: 'bad2' }
       ],
-      x1: true, x2: false, trim: false, outputDir: '/out'
+      x1: true, x2: false, trim: false, compress: false, outputDir: '/out'
     })
     expect(res.ok).toBe(true)
     expect(res.data.err).toBe(2)

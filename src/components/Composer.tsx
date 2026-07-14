@@ -116,6 +116,14 @@ export function Composer(props: Props): JSX.Element {
           >
             裁剪透明边
           </Checkbox>
+          <Tooltip title="导出后对 PNG 做无损压缩,像素不变、仅缩小体积">
+            <Checkbox
+              checked={conversation.optCompress}
+              onChange={(e) => patch({ optCompress: e.target.checked })}
+            >
+              无损压缩
+            </Checkbox>
+          </Tooltip>
         </Space>
       </div>
 

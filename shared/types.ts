@@ -38,6 +38,7 @@ export interface Conversation {
   optTrim: boolean
   opt1x: boolean
   opt2x: boolean
+  optCompress: boolean // 导出后无损压缩 PNG
   createdAt: string
   updatedAt: string
 }

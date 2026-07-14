@@ -269,6 +269,7 @@ export function createToolHandlers(deps: ToolDeps) {
         x1: cur.opt1x,
         x2: cur.opt2x,
         trim: cur.optTrim,
+        compress: cur.optCompress,
         outputDir: cur.tmpDir
       })
       emit({ type: 'tool_result', name: 'export_groups', text: res.log.join('\n') })

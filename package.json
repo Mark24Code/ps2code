@@ -30,6 +30,7 @@
     "react-markdown": "^10.1.0",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
+    "sharp": "^0.33.5",
     "typebox": "^1.1.38"
   },
   "devDependencies": {

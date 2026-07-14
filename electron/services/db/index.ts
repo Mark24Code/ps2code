@@ -47,6 +47,7 @@ function mapConversation(r: any): Conversation {
     optTrim: !!r.opt_trim,
     opt1x: !!r.opt_1x,
     opt2x: !!r.opt_2x,
+    optCompress: !!r.opt_compress,
     createdAt: r.created_at,
     updatedAt: r.updated_at
   }
@@ -102,9 +103,9 @@ export function createConversation(
 ): Conversation {
   const id = randomUUID()
   db.prepare(
-    `INSERT INTO conversations (id, project_id, title, tmp_dir, export_dir, opt_trim, opt_1x, opt_2x)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, projectId, '新对话', tmpDir, exportDir, 1, 0, 1)
+    `INSERT INTO conversations (id, project_id, title, tmp_dir, export_dir, opt_trim, opt_1x, opt_2x, opt_compress)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, projectId, '新对话', tmpDir, exportDir, 1, 0, 1, 1)
   return mapConversation(db.prepare('SELECT * FROM conversations WHERE id = ?').get(id))
 }
 
@@ -125,7 +126,7 @@ export function updateConversation(id: string, patch: Partial<Conversation>): Co
   if (!cur) throw new Error('conversation not found')
   const next = { ...cur, ...patch }
   db.prepare(
-    `UPDATE conversations SET title=?, export_dir=?, tmp_dir=?, opt_trim=?, opt_1x=?, opt_2x=?,
+    `UPDATE conversations SET title=?, export_dir=?, tmp_dir=?, opt_trim=?, opt_1x=?, opt_2x=?, opt_compress=?,
      updated_at=datetime('now') WHERE id=?`
   ).run(
     next.title,
@@ -134,6 +135,7 @@ export function updateConversation(id: string, patch: Partial<Conversation>): Co
     next.optTrim ? 1 : 0,
     next.opt1x ? 1 : 0,
     next.opt2x ? 1 : 0,
+    next.optCompress ? 1 : 0,
     id
   )
   return getConversation(id) as Conversation
