@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, Drawer, Empty, Space, Spin, Tooltip, Typography } from 'antd'
 import {
   FolderOpenOutlined,
+  FolderOutlined,
+  PictureOutlined,
   ProfileOutlined
 } from '@ant-design/icons'
 import type {
@@ -9,7 +11,6 @@ import type {
   Conversation,
   Message,
   Project,
-  LayerSummaryItem,
   VersionDiffResult,
   VersionSnapshot
 } from '@shared/types'
@@ -44,7 +45,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
   const [ready, setReady] = useState<Ready>({ state: 'idle' })
   const [logOpen, setLogOpen] = useState(false)
   const [logs, setLogs] = useState<{ ts: number; level: string; message: string }[]>([])
-  const [rightTab, setRightTab] = useState<'preview' | 'layers' | 'diff' | 'report'>('preview')
+  const [rightTab, setRightTab] = useState<'preview' | 'layers' | 'diff'>('preview')
   const msgEndRef = useRef<HTMLDivElement>(null)
 
   // 版本管理
@@ -261,7 +262,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
   const enterDiffMode = useCallback((baseVersion: number) => {
     if (!project) return
     loadDiff(project.id, baseVersion)
-    setRightTab('report') // 选中版本后默认先看报告
+    setRightTab('diff')
   }, [project, loadDiff])
 
   const exitDiffMode = useCallback(() => {
@@ -272,59 +273,25 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
 
   if (!conv || !project) return <Spin style={{ margin: 'auto' }} />
 
-  function renderLayerTree(items: LayerSummaryItem[], cssClass: string, connector: string): JSX.Element {
-    if (items.length === 0) return <div className="report-empty">无</div>
-    return (
-      <ul className="report-tree">
-        {items.map((n, i) => (
-          <li key={i} className={`report-tree-item ${cssClass}`} style={{ paddingLeft: n.depth * 20 + 8 }}>
-            <span className="report-tree-connector">{'│'.repeat(Math.max(0, n.depth))}{n.depth > 0 ? ' ' : ''}</span>
-            <span className="report-tree-name">{n.name}</span>
-            {n.changes.length > 0 && (
-              <div className="report-tree-attrs">
-                {n.changes.map((c, ci) => (
-                  <div key={ci} className="report-tree-attr">{c}</div>
-                ))}
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
-    )
-  }
 
-  function renderReportContent(): JSX.Element {
-    if (diffLoading) {
-      return <Spin style={{ display: 'block', margin: '48px auto' }} />
-    }
-    if (!diffData) {
-      return <Empty description="无差异数据" style={{ marginTop: 48 }} />
-    }
-    const layerSummary = diffData.layerSummary ?? { added: [], deleted: [], modified: [] }
+
+  /** 把序列化文本中的 ◈ 替换为文件夹/图层图标 */
+  function renderLine(text: string | null): React.ReactNode {
+    if (!text) return ''
+    const idx = text.indexOf('◈')
+    if (idx === -1) return <>{text}</>
+    const indent = text.slice(0, idx)
+    const rest = text.slice(idx + 1).trimStart()
+    const isGroup = /\s*\(group\)/.test(rest)
+    const clean = rest.replace(/\s+\((group|layer)\)/, '')
     return (
-      <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
-        <div className="report-section">
-          <div className="report-title">
-            <span className="report-icon report-icon-add" />
-            新增 · 共 {layerSummary.added.length} 个图层
-          </div>
-          {renderLayerTree(layerSummary.added, 'add', '+')}
-        </div>
-        <div className="report-section">
-          <div className="report-title">
-            <span className="report-icon report-icon-del" />
-            删除 · 共 {layerSummary.deleted.length} 个图层
-          </div>
-          {renderLayerTree(layerSummary.deleted, 'del', '−')}
-        </div>
-        <div className="report-section">
-          <div className="report-title">
-            <span className="report-icon report-icon-mod" />
-            修改 · 共 {layerSummary.modified.length} 个图层
-          </div>
-          {renderLayerTree(layerSummary.modified, 'mod', '~')}
-        </div>
-      </div>
+      <>
+        {indent}
+        <span className="diff-line-icon">
+          {isGroup ? <FolderOutlined /> : <PictureOutlined />}
+        </span>
+        {clean}
+      </>
     )
   }
 
@@ -382,8 +349,8 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
                   else if (isMod) { lCls = 'l-mod'; rCls = 'r-mod' }
                   return (
                     <tr key={i} data-diff-row={i}>
-                      <td className={lCls}>{line.left ?? ''}</td>
-                      <td className={rCls}>{line.right ?? ''}</td>
+                      <td className={lCls}>{renderLine(line.left)}</td>
+                      <td className={rCls}>{renderLine(line.right)}</td>
                     </tr>
                   )
                 })}
@@ -578,7 +545,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
             [
               ['preview', '导出预览'],
               ['layers', '图层结构'],
-              ...(diffBaseVersion !== null ? [['diff', '图层 Diff'], ['report', 'Diff 报告']] : [])
+              ...(diffBaseVersion !== null ? [['diff', '图层 Diff']] : [])
             ]
           ).map(([key, label]) => (
             <div
@@ -616,7 +583,6 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
             </div>
           )}
           {rightTab === 'diff' && renderDiffContent()}
-          {rightTab === 'report' && renderReportContent()}
         </div>
       </div>
 

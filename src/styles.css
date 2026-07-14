@@ -905,91 +905,6 @@ body {
   color: #92400e;
 }
 
-/* 报告 tab 样式 */
-.report-section {
-  margin-bottom: 20px;
-}
-.report-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 8px;
-}
-.report-icon {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-.report-icon-add { background: var(--ok); }
-.report-icon-del { background: var(--danger); }
-.report-icon-mod { background: #d97706; }
-.report-tree {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.report-tree-item {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  margin-bottom: 1px;
-  position: relative;
-}
-.report-tree-item.add {
-  background: #f0fdf4;
-  color: var(--ok);
-}
-.report-tree-item.del {
-  background: #fef2f2;
-  color: var(--danger);
-  text-decoration: line-through;
-}
-.report-tree-item.mod {
-  background: #fffbeb;
-  color: #92400e;
-  padding: 5px 8px;
-}
-.report-tree-connector {
-  color: #d1d5db;
-  font-size: 11px;
-  margin-right: 4px;
-  letter-spacing: 0;
-}
-.report-tree-name {
-  font-weight: 600;
-}
-.report-tree-attrs {
-  margin-top: 2px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.report-tree-attr {
-  font-size: 11px;
-  padding-left: 16px;
-  line-height: 1.8;
-  font-weight: 400;
-  position: relative;
-  opacity: 0.85;
-}
-.report-tree-attr::before {
-  content: "→";
-  position: absolute;
-  left: 2px;
-  color: #d97706;
-  font-weight: 700;
-}
-.report-empty {
-  font-size: 12px;
-  color: var(--text-3);
-  padding: 2px 10px;
-}
-
 /* Diff 汇总面板 */
 .diff-summary {
   padding: 8px 14px;
@@ -1073,6 +988,16 @@ body {
   min-height: 0;
   cursor: pointer;
   transition: opacity .1s;
+}
+.diff-line-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 3px;
+  vertical-align: middle;
+}
+.diff-line-icon .anticon {
+  font-size: 13px;
+  color: var(--text-2);
 }
 .diff-ruler-line:hover {
   opacity: 0.6;
