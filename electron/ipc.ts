@@ -8,6 +8,8 @@ import { dedupeFileName } from '../shared/naming'
 import type { AgentStreamEvent, AppSettings, Conversation } from '../shared/types'
 import * as db from './services/db'
 import { readPsdMeta } from './services/psd'
+import { buildLayerCache, getLayerMeta } from './services/psd/layerCache'
+import { buildLayoutManifest, type ExportMetaEntry } from './services/psd/layout'
 import { getBridge } from './services/photoshop'
 import { ensureDesignReady, testConnection } from './services/photoshop/operations'
 import { cancelAgent, checkAgentConfig, resolveConfirm, runAgent } from './services/agent'
@@ -81,6 +83,32 @@ export function registerIpc(): void {
   // ---------- PSD ----------
   ipcMain.handle(IPC.psdRead, (_e, psdPath: string) => readPsdMeta(psdPath))
 
+  // ---------- 图层缓存(每对话 layers.json) ----------
+  // 进入对话:确保缓存存在(缺失则现读落盘)
+  ipcMain.handle(IPC.layersPrepare, async (_e, conversationId: string) => {
+    const conv = db.getConversation(conversationId)
+    if (!conv) throw new Error('对话不存在')
+    const project = db.getProject(conv.projectId)
+    if (!project) throw new Error('项目不存在')
+    return getLayerMeta(conversationId, project.psdPath)
+  })
+  // 刷新:强制重建缓存(刷新按钮 / 回到 app)
+  ipcMain.handle(IPC.layersRefresh, async (_e, conversationId: string) => {
+    const conv = db.getConversation(conversationId)
+    if (!conv) throw new Error('对话不存在')
+    const project = db.getProject(conv.projectId)
+    if (!project) throw new Error('项目不存在')
+    return buildLayerCache(conversationId, project.psdPath)
+  })
+  // 读取缓存(渲染层展示;缺失时回退现读并落盘)
+  ipcMain.handle(IPC.layersGet, async (_e, conversationId: string) => {
+    const conv = db.getConversation(conversationId)
+    if (!conv) throw new Error('对话不存在')
+    const project = db.getProject(conv.projectId)
+    if (!project) throw new Error('项目不存在')
+    return getLayerMeta(conversationId, project.psdPath)
+  })
+
   // ---------- Photoshop ----------
   ipcMain.handle(IPC.psDetect, () => getBridge().detect())
   ipcMain.handle(IPC.psTest, () => testConnection())
@@ -146,6 +174,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.exportConfirm, async (_e, conversationId: string, names?: string[]) => {
     const conv = db.getConversation(conversationId)
     if (!conv) throw new Error('对话不存在')
+    const project = db.getProject(conv.projectId)
     const dest = conv.exportDir
     await mkdir(dest, { recursive: true })
     const files = existsSync(conv.tmpDir)
@@ -155,11 +184,33 @@ export function registerIpc(): void {
     const filtered = names ? files.filter((f) => names.includes(f)) : files
     // 已占用名集合:目标目录现有文件 + 本次已拷入的名字
     const taken = new Set<string>(existsSync(dest) ? await readdir(dest) : [])
+    // tmp 文件名 → 最终落地文件名(去重后),用于回写布局清单
+    const tmpToFinal = new Map<string, string>()
     for (const f of filtered) {
       const name = dedupeFileName(f, taken)
       taken.add(name)
+      tmpToFinal.set(f, name)
       await copyFile(join(conv.tmpDir, f), join(dest, name))
     }
+
+    // ---- 生成导出布局清单 layout.json(位置/尺寸/psId/zIndex/scale,便于还原) ----
+    try {
+      const metaPath = join(conv.tmpDir, '_meta.json')
+      if (project && existsSync(metaPath)) {
+        const rawMeta = await readFile(metaPath, 'utf8')
+        const metaEntries = JSON.parse(rawMeta) as ExportMetaEntry[]
+        // 只保留本次实际导出的 tmp 文件,并把文件名换成最终落地名
+        const finalEntries = metaEntries
+          .filter((m) => tmpToFinal.has(m.file))
+          .map((m) => ({ ...m, file: tmpToFinal.get(m.file)! }))
+        const layerMeta = await getLayerMeta(conversationId, project.psdPath)
+        const manifest = buildLayoutManifest(layerMeta, finalEntries)
+        await writeFile(join(dest, 'layout.json'), JSON.stringify(manifest, null, 2), 'utf8')
+      }
+    } catch {
+      /* 布局清单为附加产物,失败不影响导出结果 */
+    }
+
     return { ok: true, dir: dest, count: filtered.length }
   })
 

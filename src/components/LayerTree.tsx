@@ -5,7 +5,7 @@ import type { DataNode } from 'antd/es/tree'
 import type { PsdLayerNode, PsdMeta } from '@shared/types'
 
 interface Props {
-  psdPath: string
+  conversationId: string
 }
 
 function toDataNode(node: PsdLayerNode): DataNode {
@@ -25,52 +25,54 @@ function toDataNode(node: PsdLayerNode): DataNode {
   }
 }
 
-export function LayerTree({ psdPath }: Props): JSX.Element {
+export function LayerTree({ conversationId }: Props): JSX.Element {
   const { message } = App.useApp()
   const [meta, setMeta] = useState<PsdMeta | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // 读缓存(缺失时主进程回退现读并落盘)
   const load = useCallback((): void => {
     setError('')
     setLoading(true)
     window.api
-      .psdRead(psdPath)
+      .layersGet(conversationId)
       .then(setMeta)
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
-  }, [psdPath])
+  }, [conversationId])
 
-  const refresh = useCallback((): void => {
+  // 强制重建缓存(刷新按钮 / 回到 app)
+  const refresh = useCallback((notify: boolean): void => {
     setError('')
     setLoading(true)
     window.api
-      .psdRead(psdPath)
+      .layersRefresh(conversationId)
       .then((m) => {
         setMeta(m)
-        message.success('图层已刷新')
+        if (notify) message.success('图层已刷新')
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
-  }, [psdPath, message])
+  }, [conversationId, message])
 
   useEffect(() => {
     setMeta(null)
     load()
   }, [load])
 
-  // 窗口失焦后重新聚焦(用户可能在 PS 编辑过)→ 防抖后自动刷新一次最新状态
+  // 窗口失焦后重新聚焦(用户可能在 PS 编辑过)→ 防抖后强制重建缓存
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null
     const off = window.api.onWindowFocused(() => {
       if (timer) clearTimeout(timer)
-      timer = setTimeout(() => load(), 800)
+      timer = setTimeout(() => refresh(false), 800)
     })
     return () => {
       if (timer) clearTimeout(timer)
       off()
     }
-  }, [load])
+  }, [refresh])
 
   const treeData = useMemo(() => (meta ? meta.tree.map(toDataNode) : []), [meta])
 
@@ -95,7 +97,7 @@ export function LayerTree({ psdPath }: Props): JSX.Element {
             size="small"
             icon={<ReloadOutlined />}
             loading={loading}
-            onClick={refresh}
+            onClick={() => refresh(true)}
           >
             刷新
           </Button>

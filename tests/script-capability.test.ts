@@ -55,7 +55,7 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     })
     const res = await exportGroups({
       targetPath: '/tmp/a.psd',
-      names: ['组84'],
+      targets: [{ psId: 84, path: '根组/组84', id: '0/0', name: '组84' }],
       x1: false,
       x2: true,
       trim: true,
@@ -63,7 +63,8 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     })
     expect(res.ok).toBe(true)
     expect(res.data.files.length).toBe(1)
-    expect(fake.lastScript).toContain('组84')
+    // 文件名基名为 叶子名_节点id;脚本里含目标名与转智能对象逻辑
+    expect(fake.lastScript).toContain('组84_84')
     expect(fake.lastScript).toContain('convertToSmartObject') // 来自 export-groups.jsx
   })
 
@@ -92,7 +93,7 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     })
     const res = await exportGroups({
       targetPath: '/tmp/a.psd',
-      names: ['组84'],
+      targets: [{ psId: 84, path: '根组/组84', id: '0/0', name: '组84' }],
       x1: true, x2: false, trim: true, outputDir: '/out'
     })
     expect(res.ok).toBe(true)
@@ -113,7 +114,10 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     })
     const res = await exportGroups({
       targetPath: '/tmp/a.psd',
-      names: ['first', 'second'],
+      targets: [
+        { psId: 1, path: 'first', id: '0', name: 'first' },
+        { psId: 2, path: 'second', id: '1', name: 'second' }
+      ],
       x1: true, x2: false, trim: false, outputDir: '/out'
     })
     expect(res.data.files.length).toBe(2)
@@ -131,7 +135,7 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     })
     await exportGroups({
       targetPath: '/tmp/a.psd',
-      names: ['组84'],
+      targets: [{ psId: 84, path: '根组/组84', id: '0/0', name: '组84' }],
       x1: true, x2: false, trim: true, outputDir: '/out'
     })
     // 回退函数 exportOneGroupFallback 也应使用 exportLayerToFile
@@ -152,7 +156,7 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     })
     const res = await exportGroups({
       targetPath: '/tmp/a.psd',
-      names: ['组84'],
+      targets: [{ psId: 84, path: '根组/组84', id: '0/0', name: '组84' }],
       x1: false, x2: true, trim: false, outputDir: '/out'
     })
     expect(res.ok).toBe(true)
@@ -168,7 +172,11 @@ describe('脚本能力可执行(通过 Bridge)', () => {
     })
     const res = await exportGroups({
       targetPath: '/tmp/a.psd',
-      names: ['ok1', 'bad1', 'bad2'],
+      targets: [
+        { psId: 1, path: 'ok1', id: '0', name: 'ok1' },
+        { psId: 2, path: 'bad1', id: '1', name: 'bad1' },
+        { psId: 3, path: 'bad2', id: '2', name: 'bad2' }
+      ],
       x1: true, x2: false, trim: false, outputDir: '/out'
     })
     expect(res.ok).toBe(true)

@@ -67,6 +67,29 @@ describe('normalizeTree', () => {
     expect(tree[0].children?.[1].name).toBe('a')
   })
 
+  it('psId 取 PSD 原生 id(lyid);缺失或 0 视为无', () => {
+    const raw: RawLayer[] = [
+      { name: 'g', id: 12, children: [{ name: 'leaf', id: 34 }, { name: 'noid' }, { name: 'zero', id: 0 }] }
+    ]
+    const { tree } = normalizeTree(raw)
+    expect(tree[0].psId).toBe(12)
+    // 反转后子节点顺序 [zero, noid, leaf]
+    const leaf = tree[0].children?.find((n) => n.name === 'leaf')!
+    const noid = tree[0].children?.find((n) => n.name === 'noid')!
+    const zero = tree[0].children?.find((n) => n.name === 'zero')!
+    expect(leaf.psId).toBe(34)
+    expect(noid.psId).toBeUndefined()
+    expect(zero.psId).toBeUndefined() // 0 非合法 lyid
+  })
+
+  it('path 为图层名链路径(父/子)', () => {
+    const raw: RawLayer[] = [{ name: '根组', children: [{ name: 'x默认', children: [{ name: '1' }] }] }]
+    const { tree } = normalizeTree(raw)
+    expect(tree[0].path).toBe('根组')
+    expect(tree[0].children?.[0].path).toBe('根组/x默认')
+    expect(tree[0].children?.[0].children?.[0].path).toBe('根组/x默认/1')
+  })
+
   it('未命名图层给占位名', () => {
     const { tree } = normalizeTree([{}])
     expect(tree[0].name).toBe('(未命名)')

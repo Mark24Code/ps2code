@@ -50,6 +50,14 @@ const api = {
   // PSD
   psdRead: (psdPath: string): Promise<PsdMeta> => ipcRenderer.invoke(IPC.psdRead, psdPath),
 
+  // 图层缓存(每对话 layers.json)
+  layersPrepare: (conversationId: string): Promise<PsdMeta> =>
+    ipcRenderer.invoke(IPC.layersPrepare, conversationId),
+  layersRefresh: (conversationId: string): Promise<PsdMeta> =>
+    ipcRenderer.invoke(IPC.layersRefresh, conversationId),
+  layersGet: (conversationId: string): Promise<PsdMeta> =>
+    ipcRenderer.invoke(IPC.layersGet, conversationId),
+
   // Photoshop
   psDetect: (): Promise<{ app: string; version?: string } | null> =>
     ipcRenderer.invoke(IPC.psDetect),

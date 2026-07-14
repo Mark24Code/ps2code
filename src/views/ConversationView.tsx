@@ -88,16 +88,29 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
     }
   }, [conversationId])
 
-  // 就绪门控:确保 PS 打开对应设计稿
-  const ensureReady = useCallback((psdPath: string) => {
-    setReady({ state: 'loading' })
-    window.api
-      .psOpenDesign(psdPath)
-      .then((res) =>
-        setReady(res.ok ? { state: 'ok', message: res.message } : { state: 'error', message: res.message })
-      )
-      .catch((e) => setReady({ state: 'error', message: String(e) }))
-  }, [])
+  // 就绪门控:确保 PS 打开对应设计稿,并完成数据准备(dump 图层缓存文件)
+  const ensureReady = useCallback(
+    (psdPath: string) => {
+      setReady({ state: 'loading' })
+      window.api
+        .psOpenDesign(psdPath)
+        .then(async (res) => {
+          if (!res.ok) {
+            setReady({ state: 'error', message: res.message })
+            return
+          }
+          // 数据准备:把图层树 dump 到本对话缓存文件(失败不阻断,Agent 侧会回退现读)
+          try {
+            await window.api.layersPrepare(conversationId)
+          } catch {
+            /* 忽略:缓存准备失败不阻断进入对话 */
+          }
+          setReady({ state: 'ok', message: res.message })
+        })
+        .catch((e) => setReady({ state: 'error', message: String(e) }))
+    },
+    [conversationId]
+  )
 
   useEffect(() => {
     if (project) ensureReady(project.psdPath)
@@ -358,7 +371,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
           {rightTab === 'layers' && (
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
               <div style={{ padding: 12 }}>
-                <LayerTree psdPath={project.psdPath} />
+                <LayerTree conversationId={conversationId} />
               </div>
             </div>
           )}

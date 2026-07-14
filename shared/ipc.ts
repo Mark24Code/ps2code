@@ -32,6 +32,11 @@ export const IPC = {
   // PSD
   psdRead: 'psd:read',
 
+  // 图层缓存(每对话 layers.json)
+  layersPrepare: 'layers:prepare', // 进入对话:现读并落盘缓存
+  layersRefresh: 'layers:refresh', // 强制重建缓存(刷新按钮/回到 app)
+  layersGet: 'layers:get', // 读缓存(渲染层展示)
+
   // Photoshop
   psDetect: 'ps:detect',
   psTest: 'ps:test',

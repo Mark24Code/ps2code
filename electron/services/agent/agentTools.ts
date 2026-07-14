@@ -1,6 +1,6 @@
 import type { AgentStreamEvent } from '../../../shared/types'
 import { getConversation } from '../db'
-import { readPsdMeta } from '../psd'
+import { getLayerMeta } from '../psd/layerCache'
 import type { PsdLayerNode } from '../../../shared/types'
 import {
   exportGroups,
@@ -116,7 +116,7 @@ export function createToolHandlers(deps: ToolDeps) {
       mode?: SearchMode
       parent?: string
     }): Promise<ToolResult> {
-      const meta = await readPsdMeta(targetPath)
+      const meta = await getLayerMeta(conversationId, targetPath)
       const mode: SearchMode = args.mode === 'regex' ? 'regex' : 'fuzzy'
       let hits: LayerHit[]
       try {
@@ -144,7 +144,7 @@ export function createToolHandlers(deps: ToolDeps) {
     },
 
     async listLayers(args: { pattern?: string }): Promise<ToolResult> {
-      const meta = await readPsdMeta(targetPath)
+      const meta = await getLayerMeta(conversationId, targetPath)
       // 返回完整层级树（含 id/psId/path/name/kind/hidden/children），
       // 让 AI 理解层级关系并拿到 psId 用于精确导出
       const simplifyTree = (nodes: PsdLayerNode[]): unknown[] => {
@@ -203,7 +203,7 @@ export function createToolHandlers(deps: ToolDeps) {
 
       // 未显式给 targets 时,用 pattern/names(可选 parent)在 Node 侧搜索转成 targets。
       if (targets.length === 0) {
-        const meta = await readPsdMeta(targetPath)
+        const meta = await getLayerMeta(conversationId, targetPath)
         const seen = new Set<string>()
         const pushHits = (hits: LayerHit[]): void => {
           for (const h of hits) {

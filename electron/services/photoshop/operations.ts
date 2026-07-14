@@ -80,10 +80,13 @@ export function mutateLayers(targetPath: string, ops: LayerOp[]): Promise<JsxRes
 
 // 单个导出目标:psId 用于在 PS 中精确定位(缺失则回退按名),
 // exportName 为最终文件名基名(叶子名_节点id,已做非法字符清洗)。
+// path/id 透传,便于导出后回写布局清单(无需从文件名反推)。
 export interface ExportTargetParam {
   psId?: number
   name: string // 末端叶子图层/组名(psId 缺失时按此名定位)
   exportName: string // 文件名基名:叶子名_节点id
+  path?: string // 图层名链路径
+  id?: string // 路径式 id
 }
 
 export interface ExportParams {
@@ -118,9 +121,31 @@ export function makeExportName(t: RawExportTarget): string {
   return `${leaf}_${idPart}`
 }
 
-// 把 agentTools 的 targets 转成脚本需要的 ExportTargetParam(预计算 exportName)。
+// 按导出文件名匹配回其目标:比较文件基名(去 @2x/.png,并容忍防覆盖追加的 _NN 序号)与 exportName。
+export function matchTargetByFile(
+  file: string,
+  targets: ExportTargetParam[]
+): ExportTargetParam | undefined {
+  const base = file.replace(/@2x/i, '').replace(/\.png$/i, '')
+  // 精确等于 exportName,或 exportName 后跟 _NN 防覆盖序号
+  return targets.find(
+    (t) => base === t.exportName || new RegExp(`^${escapeRe(t.exportName)}_\\d+$`).test(base)
+  )
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// 把 agentTools 的 targets 转成脚本需要的 ExportTargetParam(预计算 exportName,透传 path/id)。
 export function toExportTargetParams(targets: RawExportTarget[]): ExportTargetParam[] {
-  return targets.map((t) => ({ psId: t.psId, name: t.name, exportName: makeExportName(t) }))
+  return targets.map((t) => ({
+    psId: t.psId,
+    name: t.name,
+    exportName: makeExportName(t),
+    path: t.path,
+    id: t.id
+  }))
 }
 
 // macOS: 使用 shell 脚本(自包含 JSX + sed + osascript)导出图层组。
@@ -170,6 +195,7 @@ async function exportGroupsViaShell(
     }>
 
     // 用实际文件路径的 basename 写 _meta.json(修正 ExtendScript 中文编码问题)
+    // 并按 exportName 把 psId/path/id 附回每条(供布局清单 join,免去从文件名反推)。
     if (parsed.ok && parsed.data.meta && parsed.data.files) {
       try {
         const { writeFile, mkdir } = await import('fs/promises')
@@ -180,7 +206,19 @@ async function exportGroupsViaShell(
           const m = parsed.data.meta![i]
           if (!m) return null
           const segs = f.split(/[/\\]/)
-          return { file: segs[segs.length - 1], group: m.group, w: m.w, h: m.h, x: m.x, y: m.y }
+          const file = segs[segs.length - 1]
+          const t = matchTargetByFile(file, params.targets)
+          return {
+            file,
+            group: m.group,
+            w: m.w,
+            h: m.h,
+            x: m.x,
+            y: m.y,
+            psId: t?.psId,
+            path: t?.path,
+            layerId: t?.id
+          }
         }).filter(Boolean)
         await writeFile(outDir + '/_meta.json', JSON.stringify(rebased), 'utf8')
       } catch { /* best-effort: meta 写入失败不影响导出结果 */ }
