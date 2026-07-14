@@ -9,7 +9,7 @@ import type {
   Conversation,
   Message,
   Project,
-  VersionDiffLine,
+  LayerSummaryItem,
   VersionDiffResult,
   VersionSnapshot
 } from '@shared/types'
@@ -272,75 +272,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
 
   if (!conv || !project) return <Spin style={{ margin: 'auto' }} />
 
-  /* ---- Diff 内容渲染 ---- */
-  interface LayerDetail { name: string; depth: number; changes: string[] }
-  interface DiffSummary { added: LayerDetail[]; deleted: LayerDetail[]; modified: LayerDetail[] }
-
-  function parseTextDepth(text: string): number {
-    const m = text.match(/^(\s*)/)
-    return m ? Math.floor(m[1].length / 2) : 0
-  }
-
-  function parseDiffLayers(lines: VersionDiffLine[]): DiffSummary {
-    const added: LayerDetail[] = []
-    const deleted: LayerDetail[] = []
-    const modified: LayerDetail[] = []
-    let currentLayer = ''
-    let currentDepth = 0
-    let layerSide: 'add' | 'del' | 'mod' = 'mod'
-    let currentChanges: string[] = []
-
-    function parseChange(left: string | null, right: string | null): string | null {
-      const text = left || right || ''
-      const trimmed = text.trim()
-      if (!trimmed || trimmed.startsWith('◈')) return null
-      const parts = trimmed.split('=')
-      const attr = parts[0].trim()
-      if (!attr) return null
-      if (left && right) {
-        const ov = left.split('=').slice(1).join('=').trim()
-        const nv = right.split('=').slice(1).join('=').trim()
-        return `${attr}: ${ov} → ${nv}`
-      } else if (left) {
-        return `${attr}: ${left.split('=').slice(1).join('=').trim()}（已删除）`
-      } else if (right) {
-        return `${attr}: ${right.split('=').slice(1).join('=').trim()}（新增）`
-      }
-      return null
-    }
-
-    for (const line of lines) {
-      const text = line.left ?? line.right ?? ''
-      if (text.startsWith('◈')) {
-        if (currentLayer) {
-          const detail: LayerDetail = { name: currentLayer, depth: currentDepth, changes: [...currentChanges] }
-          if (layerSide === 'add') added.push(detail)
-          else if (layerSide === 'del') deleted.push(detail)
-          else if (currentChanges.length) modified.push(detail)
-        }
-        currentLayer = text.replace(/^◈\s+/, '').replace(/\s+\(.*\)$/, '')
-        currentDepth = parseTextDepth(text)
-        currentChanges = []
-        layerSide = 'mod'
-        if (line.type === 'chg') {
-          if (line.left && !line.right) layerSide = 'del'
-          else if (!line.left && line.right) layerSide = 'add'
-        }
-      } else if (line.type === 'chg' && currentLayer) {
-        const ch = parseChange(line.left, line.right)
-        if (ch) currentChanges.push(ch)
-      }
-    }
-    if (currentLayer) {
-      const detail: LayerDetail = { name: currentLayer, depth: currentDepth, changes: [...currentChanges] }
-      if (layerSide === 'add') added.push(detail)
-      else if (layerSide === 'del') deleted.push(detail)
-      else if (currentChanges.length) modified.push(detail)
-    }
-    return { added, deleted, modified }
-  }
-
-  function renderLayerTree(items: LayerDetail[], cssClass: string, connector: string): JSX.Element {
+  function renderLayerTree(items: LayerSummaryItem[], cssClass: string, connector: string): JSX.Element {
     if (items.length === 0) return <div className="report-empty">无</div>
     return (
       <ul className="report-tree">
@@ -368,7 +300,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
     if (!diffData) {
       return <Empty description="无差异数据" style={{ marginTop: 48 }} />
     }
-    const layerSummary = parseDiffLayers(diffData.lines)
+    const layerSummary = diffData.layerSummary ?? { added: [], deleted: [], modified: [] }
     return (
       <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
         <div className="report-section">

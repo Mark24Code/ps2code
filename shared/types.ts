@@ -40,12 +40,26 @@ export interface VersionDiffResult {
   targetVersion: number
   lines: VersionDiffLine[]
   summary: { add: number; del: number; mod: number }
+  /** 结构化图层对比,由 main process 直接从图层树计算,比解析 lines 文本更可靠 */
+  layerSummary?: LayerSummary
 }
 
 export interface VersionDiffLine {
   left: string | null   // base 侧文本行;null = 新增行无对应
   right: string | null  // target 侧文本行;null = 删除行无对应
   type: 'eq' | 'chg'    // eq=无变化,chg=删除或新增
+}
+
+export interface LayerSummaryItem {
+  name: string
+  depth: number
+  changes: string[]
+}
+
+export interface LayerSummary {
+  added: LayerSummaryItem[]
+  deleted: LayerSummaryItem[]
+  modified: LayerSummaryItem[]
 }
 
 export interface PsdMeta {

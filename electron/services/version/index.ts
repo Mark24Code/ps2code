@@ -1,6 +1,6 @@
 import { stat } from 'fs/promises'
 import { createHash } from 'crypto'
-import type { PsdLayerNode, VersionDiffLine, VersionDiffResult, VersionSnapshot } from '../../../shared/types'
+import type { LayerSummary, LayerSummaryItem, PsdLayerNode, VersionDiffLine, VersionDiffResult, VersionSnapshot } from '../../../shared/types'
 import { readPsdMeta } from '../psd'
 import * as db from '../db'
 
@@ -195,8 +195,118 @@ export function listVersions(projectId: number): VersionSnapshot[] {
   return db.listVersionSnapshots(projectId)
 }
 
+/* ============================================================
+   结构化图层对比（直接比较 PsdLayerNode 树，更可靠）
+   ============================================================ */
+
+interface FlatNode {
+  id: string
+  psId?: number
+  name: string
+  depth: number
+  path: string
+  node: PsdLayerNode
+}
+
+function flattenTree(nodes: PsdLayerNode[], depth: number, parentPath: string, out: FlatNode[]): void {
+  for (const n of nodes) {
+    const path = parentPath ? `${parentPath}/${n.name}` : n.name
+    out.push({ id: n.id, psId: n.psId, name: n.name, depth, path, node: n })
+    if (n.children) flattenTree(n.children, depth + 1, path, out)
+  }
+}
+
+const ATTRS: (keyof PsdLayerNode)[] = ['opacity', 'blendMode', 'hidden', 'fill', 'text', 'bounds', 'width', 'height']
+
+function attrVal(node: PsdLayerNode, key: string): string {
+  const v = (node as any)[key]
+  if (v === undefined || v === null) return ''
+  if (typeof v === 'object') return JSON.stringify(v)
+  return String(v)
+}
+
+function compareAttributes(a: PsdLayerNode, b: PsdLayerNode): string[] {
+  const changes: string[] = []
+  for (const key of ATTRS) {
+    const va = attrVal(a, key)
+    const vb = attrVal(b, key)
+    if (va !== vb) {
+      if (key === 'bounds') {
+        changes.push(`bounds: (${a.bounds?.left ?? 0},${a.bounds?.top ?? 0} ${a.width}×${a.height}) → (${b.bounds?.left ?? 0},${b.bounds?.top ?? 0} ${b.width}×${b.height})`)
+      } else if (!va) {
+        changes.push(`${key} = ${vb}（新增）`)
+      } else if (!vb) {
+        changes.push(`${key} = ${va}（已删除）`)
+      } else {
+        changes.push(`${key}: ${va} → ${vb}`)
+      }
+    }
+  }
+  return changes
+}
+
+function computeLayerSummary(baseLayers: PsdLayerNode[], latestLayers: PsdLayerNode[]): LayerSummary {
+  const baseFlat: FlatNode[] = []
+  const latestFlat: FlatNode[] = []
+  flattenTree(baseLayers, 0, '', baseFlat)
+  flattenTree(latestLayers, 0, '', latestFlat)
+
+  // 建立两边索引：优先 psId，其次 path
+  const baseByPsId = new Map<number, FlatNode>()
+  const baseByPath = new Map<string, FlatNode>()
+  const latestByPsId = new Map<number, FlatNode>()
+  const latestByPath = new Map<string, FlatNode>()
+
+  for (const f of baseFlat) {
+    if (f.psId) baseByPsId.set(f.psId, f)
+    baseByPath.set(f.path, f)
+  }
+  for (const f of latestFlat) {
+    if (f.psId) latestByPsId.set(f.psId, f)
+    latestByPath.set(f.path, f)
+  }
+
+  const matched = new Set<string>()
+  const added: LayerSummaryItem[] = []
+  const deleted: LayerSummaryItem[] = []
+  const modified: LayerSummaryItem[] = []
+
+  // 用 latest 做基准遍历,匹配 base
+  for (const lf of latestFlat) {
+    let match: FlatNode | undefined
+
+    // 优先 psId 匹配
+    if (lf.psId) {
+      match = baseByPsId.get(lf.psId)
+    }
+    // 其次 path 匹配
+    if (!match) {
+      match = baseByPath.get(lf.path)
+    }
+
+    if (match) {
+      matched.add(match.id)
+      const changes = compareAttributes(match.node, lf.node)
+      if (changes.length > 0) {
+        modified.push({ name: lf.name, depth: lf.depth, changes })
+      }
+    } else {
+      added.push({ name: lf.name, depth: lf.depth, changes: [] })
+    }
+  }
+
+  // 没被匹配的 base 节点 = 被删除
+  for (const bf of baseFlat) {
+    if (!matched.has(bf.id)) {
+      deleted.push({ name: bf.name, depth: bf.depth, changes: [] })
+    }
+  }
+
+  return { added, deleted, modified }
+}
+
 /**
- * 计算某历史版本与最新版本之间的文本 diff
+ * 计算某历史版本与最新版本之间的文本 diff + 结构化对比
  */
 export function getDiff(projectId: number, baseVersion: number): VersionDiffResult {
   const baseRow = db.getVersionSnapshotRow(projectId, baseVersion)
@@ -209,9 +319,9 @@ export function getDiff(projectId: number, baseVersion: number): VersionDiffResu
   const baseLayers: PsdLayerNode[] = JSON.parse(baseRow.layerTree)
   const latestLayers: PsdLayerNode[] = JSON.parse(latestRow.layerTree)
 
+  // 文本 diff（用于 side-by-side 展示）
   const baseText = serializeLayers(baseLayers)
   const latestText = serializeLayers(latestLayers)
-
   const lines = computeLineDiff(baseText, latestText)
 
   let add = 0, del = 0, mod = 0
@@ -223,11 +333,15 @@ export function getDiff(projectId: number, baseVersion: number): VersionDiffResu
     }
   }
 
+  // 结构化图层对比（用于报告）
+  const layerSummary = computeLayerSummary(baseLayers, latestLayers)
+
   return {
     baseVersion: baseRow.version,
     targetVersion: latestRow.version,
     lines,
-    summary: { add, del, mod }
+    summary: { add, del, mod },
+    layerSummary
   }
 }
 

@@ -85,25 +85,29 @@ export function Composer(props: Props): JSX.Element {
 
   return (
     <div className="composer">
-      {/* 设计稿别针 + PS 就绪状态 + 版本入口 */}
+      {/* 设计稿别针 + PS 就绪状态(右上角) + 版本入口 */}
       <div className="composer-footer">
-        <Tooltip title={psdPath ? '打开设计稿' : undefined}>
-          <Tag
-            icon={<PaperClipOutlined />}
-            color="blue"
-            variant="filled"
-            className="design-pin"
-            style={{ cursor: psdPath ? 'pointer' : undefined }}
-            onClick={async () => {
-              if (!psdPath) return
-              await window.api.psOpenDesign(psdPath)
-              window.api.psActivate()
-            }}
-          >
-            {designName ?? '设计稿'}
-          </Tag>
-        </Tooltip>
-        {statusIcon}
+        <div className="design-tag-wrap">
+          <Tooltip title={psdPath ? '打开设计稿' : undefined}>
+            <Tag
+              icon={<PaperClipOutlined />}
+              color="blue"
+              variant="filled"
+              className="design-pin"
+              style={{ cursor: psdPath ? 'pointer' : undefined }}
+              onClick={async () => {
+                if (!psdPath) return
+                await window.api.psOpenDesign(psdPath)
+                window.api.psActivate()
+              }}
+            >
+              {designName ?? '设计稿'}
+            </Tag>
+          </Tooltip>
+          {statusIcon && (
+            <span className="design-status-badge">{statusIcon}</span>
+          )}
+        </div>
 
         {/* 版本 icon — 常驻入口 */}
         <Tooltip title="查看文件变更历史 / 开启 Diff 功能">
