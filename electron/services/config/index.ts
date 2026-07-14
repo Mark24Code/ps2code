@@ -8,9 +8,9 @@ import type { AppSettings } from '../../../shared/types'
 
 const DEFAULT_SETTINGS: AppSettings = {
   psPath: '',
-  apiBaseUrl: '',
+  apiProvider: 'deepseek',
   apiKey: '',
-  apiModel: 'claude-sonnet-4-5',
+  apiModel: 'deepseek-v4-flash',
   defaultExportDir: ''
 }
 
@@ -19,6 +19,15 @@ function configDir(): string {
 }
 function configFile(): string {
   return join(configDir(), 'config.json')
+}
+
+// pi-agent SDK 的全局配置目录:作为独立应用,一切读自 ~/.ps2code。
+export function agentDirPath(): string {
+  return configDir()
+}
+// pi-agent 凭据文件:密钥落在 ~/.ps2code/auth.json(不用默认的 ~/.pi/agent/auth.json)。
+export function authFilePath(): string {
+  return join(configDir(), 'auth.json')
 }
 
 let cache: AppSettings | null = null

@@ -70,7 +70,7 @@ const api = {
   agentCancel: (conversationId: string): Promise<void> =>
     ipcRenderer.invoke(IPC.agentCancel, conversationId),
   agentCheck: (draft?: {
-    apiBaseUrl?: string
+    apiProvider?: string
     apiKey?: string
     apiModel?: string
   }): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke(IPC.agentCheck, draft),

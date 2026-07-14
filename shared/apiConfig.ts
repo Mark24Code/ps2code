@@ -1,73 +1,78 @@
-// 解析 Agent 的 API 配置:用户设置优先,未配置时回退系统环境变量。
-// 兼容 Claude / 兼容 Anthropic 协议的第三方(如 DeepSeek 的 /anthropic 端点)。
+// 解析 Agent 的 API 配置(pi-agent SDK 模式):用户设置优先,未配置时回退系统环境变量。
+// 默认 provider 为 DeepSeek(pi 原生支持,走 OpenAI 兼容协议,无需自配端点)。
 
 export interface ResolvedApiConfig {
-  baseUrl: string // 空串表示用 SDK 默认(官方 Claude)
-  authToken: string // 密钥 / token
-  model: string
-  source: 'settings' | 'env' | 'mixed' | 'none'
+  provider: string // pi provider,如 'deepseek'
+  apiKey: string // 该 provider 的 API Key
+  model: string // 模型 id,如 'deepseek-v4-flash'
+  source: 'settings' | 'env' | 'none'
 }
 
 export interface RawSettings {
-  apiBaseUrl?: string
+  apiProvider?: string
   apiKey?: string
   apiModel?: string
 }
 
-const DEFAULT_MODEL = 'claude-sonnet-4-5'
+export const DEFAULT_PROVIDER = 'deepseek'
+export const DEFAULT_MODEL = 'deepseek-v4-flash'
 
-// 整组切换:只要用户在 app 里配置了密钥,就完全使用 app 的配置(设置组);
-// 只有 app 完全没配密钥时,才整组回退系统环境变量(环境组)。
-// 不做字段级混合,避免"配了 key 但模型栏空 → 用了环境变量的模型"这类串味。
+// provider → 回退用的环境变量名(与 pi 的 env-api-keys 一致)。
+const PROVIDER_ENV_KEY: Record<string, string> = {
+  deepseek: 'DEEPSEEK_API_KEY',
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  google: 'GEMINI_API_KEY',
+  groq: 'GROQ_API_KEY',
+  xai: 'XAI_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+  mistral: 'MISTRAL_API_KEY'
+}
+
+// 整组切换:用户在 app 里配置了密钥就完全用 app 配置;否则整组回退环境变量。
+// 不做字段级混合,避免"配了 key 但模型栏空 → 借用环境变量模型"这类串味。
 export function resolveApiConfig(
   settings: RawSettings,
   env: NodeJS.ProcessEnv = process.env
 ): ResolvedApiConfig {
   const sKey = (settings.apiKey ?? '').trim()
-  const sBase = (settings.apiBaseUrl ?? '').trim()
+  const sProvider = (settings.apiProvider ?? '').trim() || DEFAULT_PROVIDER
   const sModel = (settings.apiModel ?? '').trim()
 
   // 设置组:用户配置了密钥 → 完全采用设置
   if (sKey) {
     return {
-      authToken: sKey,
-      baseUrl: sBase, // 空则用官方默认
+      provider: sProvider,
+      apiKey: sKey,
       model: sModel || DEFAULT_MODEL,
       source: 'settings'
     }
   }
 
-  // 环境组:app 未配置 → 整组走环境变量
-  const envToken = (env.ANTHROPIC_AUTH_TOKEN ?? env.ANTHROPIC_API_KEY ?? '').trim()
-  if (envToken) {
+  // 环境组:app 未配置 → 按 provider 读对应环境变量
+  const envVar = PROVIDER_ENV_KEY[sProvider] ?? PROVIDER_ENV_KEY[DEFAULT_PROVIDER]
+  const envKey = (env[envVar] ?? '').trim()
+  if (envKey) {
     return {
-      authToken: envToken,
-      baseUrl: (env.ANTHROPIC_BASE_URL ?? '').trim(),
-      model: (env.ANTHROPIC_MODEL ?? '').trim() || DEFAULT_MODEL,
+      provider: sProvider,
+      apiKey: envKey,
+      model: sModel || DEFAULT_MODEL,
       source: 'env'
     }
   }
 
-  return { authToken: '', baseUrl: '', model: DEFAULT_MODEL, source: 'none' }
+  return { provider: sProvider, apiKey: '', model: sModel || DEFAULT_MODEL, source: 'none' }
 }
 
-// 组装给 claude-agent-sdk 的环境变量。
-// 先清除 baseEnv 里所有可能干扰的 ANTHROPIC_* 残留,再按解析结果写入,
-// 确保子进程只看到当前生效的这一组配置(不被系统环境变量串味)。
-export function buildAgentEnv(
-  cfg: ResolvedApiConfig,
-  baseEnv: NodeJS.ProcessEnv = process.env
-): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {}
-  for (const [k, v] of Object.entries(baseEnv)) {
-    if (k.startsWith('ANTHROPIC_')) continue // 丢弃所有 ANTHROPIC_* 残留
-    env[k] = v
+// provider → OpenAI 兼容的连通性校验端点(用于设置页"检查配置")。
+export function providerCheckEndpoint(provider: string): string | undefined {
+  const map: Record<string, string> = {
+    deepseek: 'https://api.deepseek.com/models',
+    openai: 'https://api.openai.com/v1/models',
+    groq: 'https://api.groq.com/openai/v1/models',
+    xai: 'https://api.x.ai/v1/models',
+    openrouter: 'https://openrouter.ai/api/v1/models',
+    mistral: 'https://api.mistral.ai/v1/models'
   }
-  if (cfg.authToken) {
-    env.ANTHROPIC_API_KEY = cfg.authToken
-    env.ANTHROPIC_AUTH_TOKEN = cfg.authToken
-  }
-  if (cfg.baseUrl) env.ANTHROPIC_BASE_URL = cfg.baseUrl
-  if (cfg.model) env.ANTHROPIC_MODEL = cfg.model
-  return env
+  return map[provider]
 }

@@ -1,13 +1,32 @@
 import { useEffect, useState } from 'react'
-import { App, Button, Card, Descriptions, Input, Space, Tag, Typography } from 'antd'
+import { App, AutoComplete, Button, Card, Descriptions, Input, Select, Space, Tag, Typography } from 'antd'
 import type { AppSettings } from '@shared/types'
 
 const empty: AppSettings = {
   psPath: '',
-  apiBaseUrl: '',
+  apiProvider: 'deepseek',
   apiKey: '',
-  apiModel: 'claude-sonnet-4-5',
+  apiModel: 'deepseek-v4-flash',
   defaultExportDir: ''
+}
+
+// pi-agent 支持的常见 provider(默认 DeepSeek)。
+const PROVIDERS = [
+  { value: 'deepseek', label: 'DeepSeek(默认)' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'google', label: 'Google Gemini' },
+  { value: 'groq', label: 'Groq' },
+  { value: 'xai', label: 'xAI' },
+  { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'mistral', label: 'Mistral' }
+]
+
+// 各 provider 的常用模型建议(可手动输入其它模型)。
+const MODEL_SUGGESTIONS: Record<string, string[]> = {
+  deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
+  openai: ['gpt-5', 'gpt-5-mini'],
+  anthropic: ['claude-opus-4-5', 'claude-sonnet-4-5']
 }
 
 export function SettingsPage(): JSX.Element {
@@ -51,7 +70,7 @@ export function SettingsPage(): JSX.Element {
     setChecking(true)
     // 用当前(未保存的)草稿配置检查
     const res = await window.api.agentCheck({
-      apiBaseUrl: s.apiBaseUrl,
+      apiProvider: s.apiProvider,
       apiKey: s.apiKey,
       apiModel: s.apiModel
     })
@@ -91,15 +110,16 @@ export function SettingsPage(): JSX.Element {
 
         <Card title="API(Agent)" size="small">
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: -4 }}>
-            默认使用 Claude。留空则回退系统环境变量:ANTHROPIC_AUTH_TOKEN、ANTHROPIC_BASE_URL、ANTHROPIC_MODEL(兼容 DeepSeek 等 Anthropic 协议端点)。
+            由 pi-agent 驱动,默认使用 DeepSeek(OpenAI 兼容协议)。密钥保存在 ~/.ps2code/auth.json。留空则回退对应 provider 的系统环境变量(如 DEEPSEEK_API_KEY)。
           </Typography.Paragraph>
           <Space orientation="vertical" style={{ width: '100%' }} size={12}>
             <div>
-              <Typography.Text type="secondary">API 地址</Typography.Text>
-              <Input
-                value={s.apiBaseUrl}
-                placeholder="https://api.anthropic.com(可留空用默认)"
-                onChange={(e) => set({ apiBaseUrl: e.target.value })}
+              <Typography.Text type="secondary">Provider</Typography.Text>
+              <Select
+                style={{ width: '100%' }}
+                value={s.apiProvider}
+                options={PROVIDERS}
+                onChange={(v) => set({ apiProvider: v })}
               />
             </div>
             <div>
@@ -112,7 +132,14 @@ export function SettingsPage(): JSX.Element {
             </div>
             <div>
               <Typography.Text type="secondary">模型</Typography.Text>
-              <Input value={s.apiModel} onChange={(e) => set({ apiModel: e.target.value })} />
+              <AutoComplete
+                style={{ width: '100%' }}
+                value={s.apiModel}
+                options={(MODEL_SUGGESTIONS[s.apiProvider] ?? []).map((m) => ({ value: m }))}
+                onChange={(v) => set({ apiModel: v })}
+              >
+                <Input placeholder="deepseek-v4-flash" />
+              </AutoComplete>
             </div>
             <Button loading={checking} onClick={checkAgent}>
               检查连接

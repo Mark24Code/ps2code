@@ -136,7 +136,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.agentCancel, (_e, conversationId: string) => cancelAgent(conversationId))
   ipcMain.handle(
     IPC.agentCheck,
-    (_e, draft?: { apiBaseUrl?: string; apiKey?: string; apiModel?: string }) =>
+    (_e, draft?: { apiProvider?: string; apiKey?: string; apiModel?: string }) =>
       checkAgentConfig(draft)
   )
   ipcMain.handle(IPC.agentLogs, (_e, conversationId: string) => getLogs(conversationId))

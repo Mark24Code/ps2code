@@ -52,7 +52,7 @@ export interface Message {
 
 export interface AppSettings {
   psPath: string
-  apiBaseUrl: string
+  apiProvider: string // pi-agent provider,如 'deepseek'
   apiKey: string
   apiModel: string
   defaultExportDir: string

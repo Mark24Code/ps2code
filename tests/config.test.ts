@@ -35,11 +35,11 @@ describe('文件配置 ~/.ps2code/config.json', () => {
   })
 
   it('保存后写回文件,且合并部分更新', () => {
-    saveConfig({ apiKey: 'k1', apiBaseUrl: 'http://x' })
+    saveConfig({ apiKey: 'k1', apiProvider: 'openai' })
     saveConfig({ apiModel: 'm2' })
     const cfg = getConfig()
     expect(cfg.apiKey).toBe('k1')
-    expect(cfg.apiBaseUrl).toBe('http://x')
+    expect(cfg.apiProvider).toBe('openai')
     expect(cfg.apiModel).toBe('m2')
     // 落盘内容一致
     const onDisk = JSON.parse(readFileSync(configFilePath(), 'utf8'))
@@ -47,15 +47,15 @@ describe('文件配置 ~/.ps2code/config.json', () => {
     expect(onDisk.apiModel).toBe('m2')
   })
 
-  it('保存时防呆:仅去除首尾空格(保留 base_url 原样含末尾斜杠)', () => {
+  it('保存时防呆:仅去除首尾空格', () => {
     const cfg = saveConfig({
       apiKey: '  sk-abc  ',
-      apiModel: ' claude-x \n',
-      apiBaseUrl: '  https://api.example.com/anthropic/  '
+      apiModel: ' deepseek-v4-pro \n',
+      apiProvider: '  deepseek  '
     })
     expect(cfg.apiKey).toBe('sk-abc')
-    expect(cfg.apiModel).toBe('claude-x')
-    expect(cfg.apiBaseUrl).toBe('https://api.example.com/anthropic/')
+    expect(cfg.apiModel).toBe('deepseek-v4-pro')
+    expect(cfg.apiProvider).toBe('deepseek')
   })
 
   it('homedir 指向临时目录(不污染真实 HOME)', () => {
