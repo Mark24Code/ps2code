@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { App, Button, Checkbox, Divider, Empty, Input, Modal, Progress, Tooltip, Typography } from 'antd'
-import { AppstoreOutlined, DeleteOutlined, ExportOutlined, FolderOpenOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, DeleteOutlined, ExportOutlined, FolderOpenOutlined, SortAscendingOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import type { Conversation } from '@shared/types'
 
 interface Props {
@@ -16,6 +16,7 @@ interface PreviewItem {
   h?: number
   x?: number
   y?: number
+  mtime: number
 }
 
 type ViewMode = 'grid' | 'list'
@@ -126,6 +127,7 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [sortAsc, setSortAsc] = useState(false) // 默认从新到旧(desc = false)
 
   useEffect(() => {
     window.api.previewList(conversation.id).then((list) => {
@@ -134,12 +136,15 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
     })
   }, [conversation.id, nonce])
 
-  // 过滤
+  // 过滤 + 按 mtime 排序
   const filtered = useMemo(() => {
-    if (!filter.trim()) return items
-    const kw = filter.trim().toLowerCase()
-    return items.filter((it) => it.name.toLowerCase().includes(kw))
-  }, [items, filter])
+    let list = items
+    if (filter.trim()) {
+      const kw = filter.trim().toLowerCase()
+      list = list.filter((it) => it.name.toLowerCase().includes(kw))
+    }
+    return [...list].sort((a, b) => sortAsc ? a.mtime - b.mtime : b.mtime - a.mtime)
+  }, [items, filter, sortAsc])
 
   const { x2, x1 } = useMemo(() => {
     const x2: PreviewItem[] = []
@@ -255,6 +260,11 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
         <Tooltip title="列表视图">
           <Button type="text" size="small" icon={<UnorderedListOutlined />} onClick={() => setViewMode('list')}
             style={{ color: viewMode === 'list' ? 'var(--brand)' : 'var(--text-3)', padding: '0 4px' }} />
+        </Tooltip>
+        <span style={{ borderLeft: '1px solid var(--border)', height: 18, margin: '0 2px' }} />
+        <Tooltip title={sortAsc ? '从旧到新' : '从新到旧'}>
+          <Button type="text" size="small" icon={<SortAscendingOutlined style={{ transform: sortAsc ? 'scaleY(1)' : 'scaleY(-1)' }} />} onClick={() => setSortAsc((v) => !v)}
+            style={{ color: 'var(--text-2)', padding: '0 4px' }} />
         </Tooltip>
         <Tooltip title="打开临时目录">
           <Button

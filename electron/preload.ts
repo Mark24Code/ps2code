@@ -100,7 +100,7 @@ const api = {
   exportConfirm: (conversationId: string, names?: string[]): Promise<{ ok: boolean; dir: string; count: number }> =>
     ipcRenderer.invoke(IPC.exportConfirm, conversationId, names),
   previewList: (conversationId: string): Promise<
-      { name: string; dataUrl: string; w?: number; h?: number; x?: number; y?: number }[]
+      { name: string; dataUrl: string; w?: number; h?: number; x?: number; y?: number; mtime: number }[]
     > => ipcRenderer.invoke(IPC.previewList, conversationId),
   previewDelete: (conversationId: string, names: string[]): Promise<{ deleted: number }> =>
     ipcRenderer.invoke(IPC.previewDelete, conversationId, names),

@@ -1,6 +1,6 @@
 import { app, dialog, ipcMain, shell } from 'electron'
 import { basename, dirname, extname, join } from 'path'
-import { copyFile, mkdir, readdir, readFile } from 'fs/promises'
+import { copyFile, mkdir, readdir, readFile, stat } from 'fs/promises'
 import { existsSync } from 'fs'
 import { unlink, writeFile } from 'fs/promises'
 import { IPC } from '../shared/ipc'
@@ -215,12 +215,24 @@ export function registerIpc(): void {
     return { ok: true, dir: dest, count: filtered.length }
   })
 
-  // ---------- 预览: 列出对话 tmp 下的 PNG,返回 dataURL + 元数据 ----------
+  // ---------- 预览: 列出对话 tmp 下的 PNG,返回 dataURL + 元数据,按 mtime 倒序 ----------
   ipcMain.handle(IPC.previewList, async (_e, conversationId: string) => {
     const conv = db.getConversation(conversationId)
     if (!conv || !existsSync(conv.tmpDir)) return []
     const files = (await readdir(conv.tmpDir)).filter((f) => f.toLowerCase().endsWith('.png'))
-    const { readFile } = await import('fs/promises')
+
+    // 按文件修改时间倒序排列
+    const withMtime = await Promise.all(
+      files.map(async (f) => {
+        try {
+          const st = await stat(join(conv.tmpDir, f))
+          return { file: f, mtime: st.mtimeMs }
+        } catch {
+          return { file: f, mtime: 0 }
+        }
+      })
+    )
+    withMtime.sort((a, b) => b.mtime - a.mtime)
 
     // 读取导出元数据(尺寸/坐标)
     let metaMap: Record<string, { w: number; h: number; x: number; y: number }> = {}
@@ -233,14 +245,15 @@ export function registerIpc(): void {
       } catch { /* ignore parse errors */ }
     }
 
-    const out: { name: string; dataUrl: string; w?: number; h?: number; x?: number; y?: number }[] = []
-    for (const f of files) {
+    const out: { name: string; dataUrl: string; w?: number; h?: number; x?: number; y?: number; mtime: number }[] = []
+    for (const { file: f, mtime } of withMtime) {
       const buf = await readFile(join(conv.tmpDir, f))
       const meta = metaMap[f]
       out.push({
         name: f,
         dataUrl: `data:image/png;base64,${buf.toString('base64')}`,
-        ...(meta || {})
+        ...(meta || {}),
+        mtime
       })
     }
     return out
