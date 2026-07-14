@@ -1,10 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, Drawer, Empty, Space, Spin, Tooltip, Typography } from 'antd'
-import { FolderOpenOutlined, ProfileOutlined } from '@ant-design/icons'
-import type { AgentStreamEvent, Conversation, Message, Project } from '@shared/types'
+import {
+  FolderOpenOutlined,
+  ProfileOutlined
+} from '@ant-design/icons'
+import type {
+  AgentStreamEvent,
+  Conversation,
+  Message,
+  Project,
+  VersionDiffResult,
+  VersionSnapshot
+} from '@shared/types'
 import { Composer } from '../components/Composer'
 import { PreviewPane } from '../components/PreviewPane'
 import { LayerTree } from '../components/LayerTree'
+import { VersionTimeline } from '../components/VersionTimeline'
 import { MessageBubble } from '../components/MessageBubble'
 import { ThinkingBubble } from '../components/ThinkingBubble'
 
@@ -32,8 +43,15 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
   const [ready, setReady] = useState<Ready>({ state: 'idle' })
   const [logOpen, setLogOpen] = useState(false)
   const [logs, setLogs] = useState<{ ts: number; level: string; message: string }[]>([])
-  const [rightTab, setRightTab] = useState<'preview' | 'layers'>('preview')
+  const [rightTab, setRightTab] = useState<'preview' | 'layers' | 'diff'>('preview')
   const msgEndRef = useRef<HTMLDivElement>(null)
+
+  // 版本管理
+  const [latestVersion, setLatestVersion] = useState<VersionSnapshot | null>(null)
+  const [diffBaseVersion, setDiffBaseVersion] = useState<number | null>(null)
+  const [diffData, setDiffData] = useState<VersionDiffResult | null>(null)
+  const [diffLoading, setDiffLoading] = useState(false)
+  const [timelineOpen, setTimelineOpen] = useState(false)
 
   // 右侧面板可拖拽宽度
   const [rightWidth, setRightWidth] = useState(680)
@@ -116,6 +134,43 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
     if (project) ensureReady(project.psdPath)
   }, [project, conversationId, ensureReady])
 
+  // 版本检查:进入对话时触发一次
+  useEffect(() => {
+    if (!project) return
+    let cancelled = false
+    window.api.versionsCheck(project.id).then((r) => {
+      if (cancelled) return
+      setLatestVersion(r.snapshot)
+    }).catch(() => { /* 静默失败 */ })
+    // 初始加载版本列表(供 timeline 使用;不阻塞)
+    window.api.versionsList(project.id).catch(() => {})
+    return () => { cancelled = true }
+  }, [project])
+
+  // 窗口重新聚焦 → 检查 PSD 是否有变化
+  useEffect(() => {
+    if (!project) return
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const off = window.api.onWindowFocused(() => {
+      if (timer) clearTimeout(timer)
+      // 防抖:用户可能频繁切回
+      timer = setTimeout(async () => {
+        try {
+          const r = await window.api.versionsCheck(project.id)
+          setLatestVersion(r.snapshot)
+          // 若正处于 diff 模式,刷新 diff 数据(最新版变了)
+          if (diffBaseVersion !== null && r.created) {
+            loadDiff(project.id, diffBaseVersion)
+          }
+        } catch { /* 静默 */ }
+      }, 800)
+    })
+    return () => {
+      if (timer) clearTimeout(timer)
+      off()
+    }
+  }, [project, diffBaseVersion])
+
   useEffect(() => {
     msgEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -188,7 +243,80 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
     onConversationUpdated()
   }
 
+  // ---------- 版本 Diff ----------
+  const loadDiff = useCallback(async (pid: number, baseVersion: number) => {
+    setDiffLoading(true)
+    try {
+      const result = await window.api.versionsDiff(pid, baseVersion)
+      setDiffData(result)
+      setDiffBaseVersion(baseVersion)
+    } catch (e) {
+      setDiffData(null)
+    } finally {
+      setDiffLoading(false)
+    }
+  }, [])
+
+  const enterDiffMode = useCallback((baseVersion: number) => {
+    if (!project) return
+    loadDiff(project.id, baseVersion)
+    setRightTab('diff')
+  }, [project, loadDiff])
+
+  const exitDiffMode = useCallback(() => {
+    setDiffBaseVersion(null)
+    setDiffData(null)
+    setRightTab('preview')
+  }, [])
+
   if (!conv || !project) return <Spin style={{ margin: 'auto' }} />
+
+  /* ---- Diff 内容渲染 ---- */
+  function renderDiffContent(): JSX.Element {
+    if (diffLoading) {
+      return <Spin style={{ display: 'block', margin: '48px auto' }} />
+    }
+    if (!diffData) {
+      return <Empty description="加载差异数据失败" style={{ marginTop: 48 }} />
+    }
+    const { lines, summary, baseVersion, targetVersion } = diffData
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div className="diff-header">
+          <span className="diff-header-left">v{baseVersion}</span>
+          <span className="diff-header-arrow">→</span>
+          <span className="diff-header-right">v{targetVersion}（最新）</span>
+          <span className="diff-header-counts">
+            <span className="diff-count-add">+{summary.add}</span>
+            <span className="diff-count-del">-{summary.del}</span>
+            <span className="diff-count-mod">~{summary.mod}</span>
+          </span>
+        </div>
+        <div className="diff-scroll">
+          <table className="diff-table">
+            <tbody>
+              {lines.map((line, i) => {
+                const lCls = line.type === 'chg' && line.left ? 'l-del' : ''
+                const rCls = line.type === 'chg' && line.right ? 'r-add' : ''
+                const lEmpty = !line.left ? 'empty' : ''
+                const rEmpty = !line.right ? 'empty' : ''
+                return (
+                  <tr key={i}>
+                    <td className={`${lCls} ${lEmpty}`}>
+                      {line.left ?? ''}
+                    </td>
+                    <td className={`${rCls} ${rEmpty}`}>
+                      {line.right ?? ''}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
 
   const gateDisabled = ready.state !== 'ok'
 
@@ -199,6 +327,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
           <Typography.Text className="title" title={conv.title}>
             {conv.title}
           </Typography.Text>
+
           <span style={{ flex: 1 }} />
           <Tooltip title="查看请求日志">
             <Button
@@ -307,6 +436,11 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
           psdPath={project.psdPath}
           readyState={ready.state}
           readyMessage={ready.message}
+          latestVersion={latestVersion}
+          diffBaseVersion={diffBaseVersion}
+          diffData={diffData}
+          onOpenTimeline={() => setTimelineOpen(true)}
+          onExitDiffMode={exitDiffMode}
           onSend={send}
           onStop={() => {
             window.api.agentCancel(conversationId)
@@ -340,13 +474,16 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
           borderBottom: '1px solid var(--border)',
           padding: '0 12px'
         }}>
-          {([
-            ['preview', '导出预览'],
-            ['layers', '图层结构']
-          ] as const).map(([key, label]) => (
+          {(
+            [
+              ['preview', '导出预览'],
+              ['layers', '图层结构'],
+              ...(diffBaseVersion !== null ? [['diff', 'Diff']] : [])
+            ]
+          ).map(([key, label]) => (
             <div
               key={key}
-              onClick={() => setRightTab(key)}
+              onClick={() => setRightTab(key as typeof rightTab)}
               style={{
                 padding: '12px 16px',
                 cursor: 'pointer',
@@ -375,8 +512,21 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
               </div>
             </div>
           )}
+          {rightTab === 'diff' && renderDiffContent()}
         </div>
       </div>
+
+      {/* 版本 Timeline Modal */}
+      {project && (
+        <VersionTimeline
+          open={timelineOpen}
+          onClose={() => setTimelineOpen(false)}
+          projectId={project.id}
+          currentVersionLabel={latestVersion?.label ?? null}
+          diffBaseVersion={diffBaseVersion}
+          onSelectVersion={(v) => enterDiffMode(v)}
+        />
+      )}
     </div>
   )
 }

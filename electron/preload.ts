@@ -5,7 +5,9 @@ import type {
   Conversation,
   Message,
   Project,
-  PsdMeta
+  PsdMeta,
+  VersionDiffResult,
+  VersionSnapshot
 } from '../shared/types'
 
 const api = {
@@ -125,7 +127,15 @@ const api = {
     latest?: string
     url?: string
     error?: string
-  }> => ipcRenderer.invoke(IPC.checkUpdate)
+  }> => ipcRenderer.invoke(IPC.checkUpdate),
+
+  // 版本管理
+  versionsCheck: (projectId: number): Promise<{ created: boolean; snapshot: VersionSnapshot }> =>
+    ipcRenderer.invoke(IPC.versionsCheck, projectId),
+  versionsList: (projectId: number): Promise<VersionSnapshot[]> =>
+    ipcRenderer.invoke(IPC.versionsList, projectId),
+  versionsDiff: (projectId: number, baseVersion: number): Promise<VersionDiffResult> =>
+    ipcRenderer.invoke(IPC.versionsDiff, projectId, baseVersion),
 }
 
 contextBridge.exposeInMainWorld('api', api)

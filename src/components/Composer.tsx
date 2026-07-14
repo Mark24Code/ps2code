@@ -3,12 +3,14 @@ import { App, Button, Checkbox, Input, Space, Spin, Tag, Tooltip, Typography } f
 import {
   CheckCircleFilled,
   CloseCircleFilled,
+  CloseOutlined,
   EditOutlined,
   FolderOpenOutlined,
+  HistoryOutlined,
   PaperClipOutlined,
   PauseCircleFilled
 } from '@ant-design/icons'
-import type { Conversation } from '@shared/types'
+import type { Conversation, VersionDiffResult, VersionSnapshot } from '@shared/types'
 
 interface Props {
   conversation: Conversation
@@ -18,6 +20,11 @@ interface Props {
   psdPath?: string
   readyState?: 'idle' | 'loading' | 'ok' | 'error'
   readyMessage?: string
+  latestVersion?: VersionSnapshot | null
+  diffBaseVersion?: number | null
+  diffData?: VersionDiffResult | null
+  onOpenTimeline?: () => void
+  onExitDiffMode?: () => void
   onSend: (text: string) => void
   onStop: () => void
   onUpdate: (c: Conversation) => void
@@ -26,8 +33,9 @@ interface Props {
 // 对话框上方:设计稿别针标识 + PS 就绪状态。
 // 下方:导出设置(分行展示,不挤一排)。最后是输入框。
 export function Composer(props: Props): JSX.Element {
-  const { conversation, busy, disabled, designName, psdPath, readyState, readyMessage, onSend, onStop, onUpdate } =
-    props
+  const { conversation, busy, disabled, designName, psdPath, readyState, readyMessage,
+    latestVersion, diffBaseVersion, diffData, onOpenTimeline, onExitDiffMode,
+    onSend, onStop, onUpdate } = props
   const { message } = App.useApp()
   const [text, setText] = useState('')
 
@@ -77,7 +85,7 @@ export function Composer(props: Props): JSX.Element {
 
   return (
     <div className="composer">
-      {/* 设计稿别针 + PS 就绪状态 */}
+      {/* 设计稿别针 + PS 就绪状态 + 版本入口 */}
       <div className="composer-footer">
         <Tooltip title={psdPath ? '打开设计稿' : undefined}>
           <Tag
@@ -96,6 +104,40 @@ export function Composer(props: Props): JSX.Element {
           </Tag>
         </Tooltip>
         {statusIcon}
+
+        {/* 版本 icon — 常驻入口 */}
+        <Tooltip title="查看文件变更历史 / 开启 Diff 功能">
+          <Button
+            type="text"
+            size="small"
+            className="version-icon-btn"
+            icon={
+              <span className="version-icon-wrap">
+                <HistoryOutlined />
+                {latestVersion && (
+                  <span className="version-badge">{latestVersion.label}</span>
+                )}
+              </span>
+            }
+            onClick={() => onOpenTimeline?.()}
+          />
+        </Tooltip>
+
+        {/* Diff 模式 tag */}
+        {diffBaseVersion !== null && diffData && (
+          <div className="diff-tag">
+            <span className="diff-tag-label">v{diffData.baseVersion}</span>
+            <span className="diff-tag-arrow">→</span>
+            <span className="diff-tag-cur">当前</span>
+            <Button
+              type="text"
+              size="small"
+              className="diff-tag-close"
+              icon={<CloseOutlined />}
+              onClick={() => onExitDiffMode?.()}
+            />
+          </div>
+        )}
       </div>
 
       {/* 导出倍率 */}

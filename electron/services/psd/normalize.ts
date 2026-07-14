@@ -9,6 +9,10 @@ export interface RawLayer {
   top?: number
   right?: number
   bottom?: number
+  opacity?: number // 0-255
+  blendMode?: string
+  text?: { text?: string }
+  fill?: string
   children?: RawLayer[]
 }
 
@@ -35,6 +39,12 @@ function toNode(
   counters.layers++
   if (isGroup) counters.groups++
 
+  // text layer content
+  let layerText: string | undefined
+  if (layer.text && typeof layer.text === 'object' && 'text' in layer.text) {
+    layerText = (layer.text as { text?: string }).text
+  }
+
   const node: PsdLayerNode = {
     id,
     // ag-psd 缺失或为 0 时视为无原生 id(0 不是合法 lyid)
@@ -45,7 +55,11 @@ function toNode(
     hidden: layer.hidden === true,
     bounds: { left, top, right, bottom },
     width: Math.max(0, right - left),
-    height: Math.max(0, bottom - top)
+    height: Math.max(0, bottom - top),
+    opacity: typeof layer.opacity === 'number' ? layer.opacity : undefined,
+    blendMode: layer.blendMode,
+    text: layerText,
+    fill: layer.fill
   }
 
   if (isGroup && layer.children) {

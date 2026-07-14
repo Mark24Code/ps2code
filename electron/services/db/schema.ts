@@ -38,6 +38,19 @@ export function createSchema(db: Database.Database): void {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS version_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      version INTEGER NOT NULL,
+      label TEXT NOT NULL,
+      mtime TEXT NOT NULL DEFAULT '',
+      size TEXT NOT NULL DEFAULT '',
+      layer_hash TEXT NOT NULL,
+      layer_tree TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(project_id, version)
+    );
   `)
 
   // 迁移:为既有库补齐新列(CREATE TABLE IF NOT EXISTS 不会给旧表加列)。

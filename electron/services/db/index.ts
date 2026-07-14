@@ -6,7 +6,9 @@ import type {
   AppSettings,
   Conversation,
   Message,
-  Project
+  Project,
+  VersionSnapshot,
+  VersionSnapshotRow
 } from '../../../shared/types'
 import { createSchema } from './schema'
 import { getConfig, saveConfig } from '../config'
@@ -169,4 +171,74 @@ export function getSettings(): AppSettings {
 
 export function setSettings(patch: Partial<AppSettings>): AppSettings {
   return saveConfig(patch)
+}
+
+// ---------- 版本快照 ----------
+function mapVersionSnapshot(r: any): VersionSnapshot {
+  return {
+    id: r.id,
+    projectId: r.project_id,
+    version: r.version,
+    label: r.label,
+    mtime: r.mtime,
+    size: r.size,
+    layerHash: r.layer_hash,
+    createdAt: r.created_at
+  }
+}
+
+function mapVersionSnapshotRow(r: any): VersionSnapshotRow {
+  return {
+    ...mapVersionSnapshot(r),
+    layerTree: r.layer_tree
+  }
+}
+
+export function createVersionSnapshot(
+  projectId: number,
+  version: number,
+  label: string,
+  mtime: string,
+  size: string,
+  layerHash: string,
+  layerTree: string
+): VersionSnapshot {
+  const info = db
+    .prepare(
+      `INSERT INTO version_snapshots (project_id, version, label, mtime, size, layer_hash, layer_tree)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(projectId, version, label, mtime, size, layerHash, layerTree)
+  return mapVersionSnapshot(
+    db.prepare('SELECT * FROM version_snapshots WHERE id = ?').get(info.lastInsertRowid)
+  )
+}
+
+export function listVersionSnapshots(projectId: number): VersionSnapshot[] {
+  return db
+    .prepare('SELECT * FROM version_snapshots WHERE project_id = ? ORDER BY version DESC')
+    .all(projectId)
+    .map(mapVersionSnapshot)
+}
+
+export function getLatestVersionSnapshot(projectId: number): VersionSnapshot | null {
+  const r = db
+    .prepare('SELECT * FROM version_snapshots WHERE project_id = ? ORDER BY version DESC LIMIT 1')
+    .get(projectId)
+  return r ? mapVersionSnapshot(r) : null
+}
+
+export function getVersionSnapshotRow(
+  projectId: number,
+  version: number
+): VersionSnapshotRow | null {
+  const r = db
+    .prepare('SELECT * FROM version_snapshots WHERE project_id = ? AND version = ?')
+    .get(projectId, version)
+  return r ? mapVersionSnapshotRow(r) : null
+}
+
+export function getVersionSnapshotRowById(id: number): VersionSnapshotRow | null {
+  const r = db.prepare('SELECT * FROM version_snapshots WHERE id = ?').get(id)
+  return r ? mapVersionSnapshotRow(r) : null
 }

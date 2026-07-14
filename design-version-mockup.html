@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设计稿版本管理 · Mockup</title>
+<style>
+  :root {
+    --add: #16a34a;
+    --add-bg: #e7f8ed;
+    --del: #dc2626;
+    --del-bg: #fdeaea;
+    --latest-bg: #dcfce7;
+    --latest-border: #86efac;
+    --bg: #f3f4f6;
+    --panel: #ffffff;
+    --border: #e5e7eb;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --accent: #4f46e5;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text);
+    -webkit-font-smoothing: antialiased; line-height: 1.5;
+    height: 100vh; overflow: hidden;
+  }
+  .app { display: flex; height: 100vh; }
+
+  /* ---------- 主区 ---------- */
+  .stage { flex: 1; padding: 32px; overflow-y: auto; }
+  .stage-inner { max-width: 720px; margin: 0 auto; }
+  .stage-title { font-size: 13px; color: var(--muted); margin-bottom: 12px; letter-spacing: .3px; }
+
+  .file-bar {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px; display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04); flex-wrap: wrap;
+  }
+  .thumb {
+    width: 46px; height: 46px; border-radius: 8px;
+    background: linear-gradient(135deg,#818cf8,#4f46e5);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 600; font-size: 12px; flex-shrink: 0;
+  }
+  .file-meta { flex: 1; min-width: 120px; }
+  .file-name { font-size: 15px; font-weight: 600; }
+  .file-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .icons { display: flex; align-items: center; gap: 8px; }
+
+  .icon-btn {
+    position: relative; width: 38px; height: 38px; border-radius: 9px;
+    border: 1px solid var(--border); background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: default; transition: background .15s, border-color .15s, transform .1s;
+  }
+  .icon-btn.clickable { cursor: pointer; }
+  .icon-btn.clickable:hover { background: #f9fafb; border-color: #d1d5db; }
+  .icon-btn.clickable:active { transform: scale(.96); }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .icon-ready svg { color: var(--add); }
+  .icon-version { border-color: var(--latest-border); background: #f0fdf4; }
+  .icon-version svg { color: var(--add); }
+  .badge {
+    position: absolute; top: -6px; right: -6px; background: var(--accent); color: #fff;
+    font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 8px;
+    min-width: 18px; text-align: center; box-shadow: 0 0 0 2px #fff;
+  }
+
+  /* diff 模式 tag */
+  .diff-tag {
+    display: none; align-items: center; gap: 8px;
+    background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3;
+    padding: 6px 8px 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  }
+  .diff-tag.show { display: inline-flex; }
+  .diff-tag .arrow { color: var(--accent); }
+  .diff-tag .cur { color: var(--add); }
+  .diff-tag .x {
+    width: 18px; height: 18px; border-radius: 50%; border: none; cursor: pointer;
+    background: #c7d2fe; color: #3730a3; font-size: 12px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .diff-tag .x:hover { background: #a5b4fc; }
+
+  /* tooltip */
+  .tip { position: relative; }
+  .tip::after {
+    content: attr(data-tip); position: absolute; top: calc(100% + 8px); right: 0;
+    background: #111827; color: #fff; font-size: 12px; white-space: nowrap;
+    padding: 6px 10px; border-radius: 6px; opacity: 0; pointer-events: none;
+    transform: translateY(-4px); transition: opacity .15s, transform .15s; z-index: 30;
+  }
+  .tip:hover::after { opacity: 1; transform: translateY(0); }
+
+  .controls { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .controls .hint { font-size: 12px; color: var(--muted); width: 100%; margin-bottom: 2px; }
+  .btn {
+    border: 1px solid var(--border); background: #fff; padding: 8px 14px;
+    border-radius: 8px; font-size: 13px; cursor: pointer; transition: background .15s, border-color .15s;
+  }
+  .btn:hover { background: #f9fafb; border-color: #d1d5db; }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: #4338ca; }
+
+  .canvas-preview {
+    margin-top: 20px; border: 1px dashed var(--border); border-radius: 12px;
+    height: 240px; background:
+      repeating-linear-gradient(45deg,#fafafa,#fafafa 12px,#f3f4f6 12px,#f3f4f6 24px);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 13px;
+  }
+
+  /* ---------- 右侧 Diff Dock ---------- */
+  .diff-dock {
+    width: 0; flex-shrink: 0; background: var(--panel); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+    transition: width .22s ease;
+  }
+  .diff-dock.open { width: 560px; }
+  .dock-head {
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .dock-head h3 { font-size: 14px; font-weight: 600; flex: 1; }
+  .dock-head .x2 { border: none; background: transparent; font-size: 18px; cursor: pointer; color: var(--muted); }
+  .dock-tabs { display: flex; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid var(--border); }
+  .dock-tab {
+    padding: 7px 14px; font-size: 13px; border: 1px solid transparent; border-bottom: none;
+    border-radius: 8px 8px 0 0; cursor: pointer; color: var(--muted); position: relative; top: 1px;
+  }
+  .dock-tab.active { color: var(--accent); border-color: var(--border); background: #fff; font-weight: 600; }
+
+  .dock-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+  .diff-legend {
+    display: flex; gap: 16px; padding: 10px 16px; font-size: 12px; color: var(--muted);
+    border-bottom: 1px solid var(--border); align-items: center;
+  }
+  .diff-legend .lg { display: inline-flex; align-items: center; gap: 6px; }
+  .diff-legend .sw { width: 12px; height: 12px; border-radius: 3px; }
+  .diff-legend .sw.del { background: var(--del-bg); border: 1px solid var(--del); }
+  .diff-legend .sw.add { background: var(--add-bg); border: 1px solid var(--add); }
+  .diff-legend .counts { margin-left: auto; font-weight: 600; }
+  .diff-legend .cadd { color: var(--add); }
+  .diff-legend .cdel { color: var(--del); }
+
+  .diff-colhead { display: flex; font-size: 12px; font-weight: 700; border-bottom: 1px solid var(--border); }
+  .diff-colhead > div { flex: 1; padding: 8px 12px; }
+  .diff-colhead .l { color: var(--muted); border-right: 1px solid var(--border); }
+  .diff-colhead .r { color: var(--add); }
+
+  .diff-scroll { flex: 1; overflow: auto; }
+  .diff-table { width: 100%; border-collapse: collapse; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  .diff-table td {
+    vertical-align: top; padding: 2px 10px; white-space: pre-wrap; word-break: break-word;
+    width: 50%; border-right: 1px solid var(--border);
+    line-height: 1.7;
+  }
+  .diff-table td.gutter {
+    width: 22px; min-width: 22px; padding: 2px 0; text-align: center; color: #b0b4bd;
+    background: #fafafa; border-right: none; user-select: none; font-weight: 700;
+  }
+  .diff-table td.l-del { background: var(--del-bg); }
+  .diff-table td.l-del .gutter, .diff-table td.r-add .gutter { }
+  .diff-table td.r-add { background: var(--add-bg); }
+  .diff-table td.l-del { color: #991b1b; }
+  .diff-table td.r-add { color: #166534; }
+  .diff-table tr.hdr td { font-weight: 700; color: var(--text); background: #f9fafb; }
+  .diff-table td.empty { background: #fcfcfc; }
+
+  /* ---------- Modal ---------- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(17,24,39,.45);
+    display: none; align-items: center; justify-content: center; z-index: 50; padding: 24px;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: var(--panel); border-radius: 14px; width: 100%; max-width: 460px; max-height: 80vh;
+    display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,.25);
+  }
+  .modal-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; }
+  .modal-head h2 { font-size: 15px; font-weight: 600; flex: 1; }
+  .close-x { border: none; background: transparent; font-size: 20px; cursor: pointer; color: var(--muted); line-height: 1; }
+  .modal-body { overflow-y: auto; }
+
+  .timeline { padding: 14px 20px 20px; }
+  .tl-item {
+    position: relative; padding: 14px 14px 14px 44px; border-radius: 10px; cursor: pointer;
+    margin-bottom: 6px; border: 1px solid transparent; transition: background .12s, border-color .12s;
+  }
+  .tl-item:hover { background: #f9fafb; border-color: var(--border); }
+  .tl-item.latest { background: var(--latest-bg); border-color: var(--latest-border); }
+  .tl-item.latest:hover { background: #cdf6d6; }
+  .tl-item.active { border-color: var(--accent); background: #eef2ff; }
+  .tl-item::before { content: ""; position: absolute; left: 19px; top: 0; bottom: -6px; width: 2px; background: var(--border); }
+  .tl-item:last-child::before { bottom: 50%; }
+  .tl-item:first-child::before { top: 50%; }
+  .tl-dot { position: absolute; left: 13px; top: 18px; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid var(--accent); z-index: 1; }
+  .tl-item.latest .tl-dot { border-color: var(--add); }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; }
+  .tl-name { font-weight: 700; font-size: 15px; }
+  .tl-latest-tag { font-size: 10px; font-weight: 700; color: var(--add); background: #fff; border: 1px solid var(--latest-border); padding: 1px 7px; border-radius: 10px; }
+  .tl-time { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .tl-summary { font-size: 12px; color: var(--muted); margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .tl-cta { font-size: 12px; color: var(--accent); margin-top: 6px; opacity: 0; transition: opacity .12s; }
+  .tl-item:hover .tl-cta { opacity: 1; }
+  .tl-item.latest .tl-cta { color: var(--muted); }
+  .chip { display: inline-flex; align-items: center; gap: 4px; }
+  .chip::before { content:""; width: 7px; height: 7px; border-radius: 2px; }
+  .chip.add::before { background: var(--add); }
+  .chip.del::before { background: var(--del); }
+  .chip.mod::before { background: #d97706; }
+
+  /* toast */
+  .toast {
+    position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #111827; color: #fff; font-size: 13px; padding: 11px 18px; border-radius: 10px;
+    opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 80;
+    box-shadow: 0 8px 24px rgba(0,0,0,.3); max-width: 80vw;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 主区 -->
+  <div class="stage">
+    <div class="stage-inner">
+      <div class="stage-title">设计稿版本管理 · 交互 Mockup</div>
+
+      <div class="file-bar">
+        <div class="thumb">PSD</div>
+        <div class="file-meta">
+          <div class="file-name">Homepage.psd</div>
+          <div class="file-sub" id="fileSub">最新 v3 · 12 图层 · 2.4 MB</div>
+        </div>
+        <div class="icons">
+          <div class="icon-btn icon-ready tip" data-tip="文件已就绪">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <div class="icon-btn icon-version clickable tip" id="versionIcon" data-tip="查看文件变更历史 / 开启 Diff 功能">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 21h16"/></svg>
+            <span class="badge" id="versionBadge">v3</span>
+          </div>
+          <!-- diff 模式 tag -->
+          <div class="diff-tag" id="diffTag">
+            <span id="diffTagText"></span>
+            <span class="arrow">→</span>
+            <span class="cur">当前</span>
+            <button class="x" id="diffTagX" title="退出 Diff 模式">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="hint">▼ 演示「聚焦重新获得图层」时的触发逻辑（真实环境中由文件系统 mtime/size + 图层 hash 判断）</div>
+        <button class="btn btn-primary" id="btnChange">模拟聚焦（内容已变 → 递增版本）</button>
+        <button class="btn" id="btnNoChange">模拟聚焦（内容未变 → 不递增）</button>
+      </div>
+
+      <div class="canvas-preview">画布区（用户始终编辑最新版）</div>
+    </div>
+  </div>
+
+  <!-- 右侧 Diff Dock -->
+  <aside class="diff-dock" id="diffDock">
+    <div class="dock-head">
+      <h3 id="dockTitle">图层 Diff</h3>
+      <button class="x2" id="dockClose">✕</button>
+    </div>
+    <div class="dock-tabs">
+      <div class="dock-tab active">Diff</div>
+    </div>
+    <div class="dock-body">
+      <div class="diff-legend">
+        <span class="lg"><span class="sw del"></span>旧版（删除/变更前）</span>
+        <span class="lg"><span class="sw add"></span>当前（新增/变更后）</span>
+        <span class="counts" id="dockCounts"></span>
+      </div>
+      <div class="diff-colhead">
+        <div class="l" id="colL">v?</div>
+        <div class="r" id="colR">当前（最新）</div>
+      </div>
+      <div class="diff-scroll">
+        <table class="diff-table"><tbody id="diffBody"></tbody></table>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>文件变更历史</h2>
+      <button class="close-x" id="closeBtn">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="timelineView" class="timeline"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   模拟数据：每个版本一份图层树快照
+   ============================================================ */
+let versionSeq = 3;
+
+const v1Layers = [
+  { id:'bg', name:'背景', type:'group', children:[
+      { id:'bg-fill', name:'底色', type:'rect', bounds:{x:0,y:0,w:1440,h:900}, opacity:100, visible:true, fill:'#ffffff' },
+  ]},
+  { id:'nav', name:'导航栏', type:'group', children:[
+      { id:'logo', name:'Logo', type:'image', bounds:{x:40,y:24,w:120,h:40}, opacity:100, visible:true },
+      { id:'menu', name:'菜单', type:'text', bounds:{x:900,y:30,w:400,h:28}, opacity:100, visible:true, text:'首页 产品 定价' },
+  ]},
+  { id:'hero', name:'主视觉', type:'group', children:[
+      { id:'title', name:'标题', type:'text', bounds:{x:120,y:220,w:600,h:64}, opacity:100, visible:true, text:'构建更好的产品', fill:'#111827' },
+      { id:'cta', name:'按钮', type:'rect', bounds:{x:120,y:340,w:160,h:48}, opacity:100, visible:true, fill:'#4f46e5' },
+  ]},
+];
+const v2Layers = [
+  { id:'bg', name:'背景', type:'group', children:[
+      { id:'bg-fill', name:'底色', type:'rect', bounds:{x:0,y:0,w:1440,h:900}, opacity:100, visible:true, fill:'#f9fafb' },
+  ]},
+  { id:'nav', name:'导航栏', type:'group', children:[
+      { id:'logo', name:'Logo', type:'image', bounds:{x:40,y:24,w:120,h:40}, opacity:100, visible:true },
+      { id:'menu', name:'菜单', type:'text', bounds:{x:900,y:30,w:400,h:28}, opacity:100, visible:true, text:'首页 产品 定价 博客' },
+  ]},
+  { id:'hero', name:'主视觉', type:'group', children:[
+      { id:'title', name:'标题', type:'text', bounds:{x:120,y:220,w:600,h:64}, opacity:100, visible:true, text:'构建更好的产品', fill:'#111827' },
+      { id:'cta', name:'按钮', type:'rect', bounds:{x:120,y:340,w:160,h:48}, opacity:100, visible:true, fill:'#4f46e5' },
+      { id:'sub', name:'副标题', type:'text', bounds:{x:120,y:300,w:500,h:24}, opacity:100, visible:true, text:'为团队而生' },
+  ]},
+];
+const v3Layers = [
+  { id:'bg', name:'背景', type:'group', children:[
+      { id:'bg-fill', name:'底色', type:'rect', bounds:{x:0,y:0,w:1440,h:900}, opacity:100, visible:true, fill:'#f9fafb' },
+  ]},
+  { id:'nav', name:'导航栏', type:'group', children:[
+      { id:'logo', name:'Logo', type:'image', bounds:{x:40,y:24,w:140,h:44}, opacity:100, visible:true },
+      { id:'menu', name:'菜单', type:'text', bounds:{x:880,y:30,w:420,h:28}, opacity:100, visible:true, text:'首页 产品 定价 博客' },
+  ]},
+  { id:'hero', name:'主视觉', type:'group', children:[
+      { id:'title', name:'标题', type:'text', bounds:{x:148,y:220,w:600,h:64}, opacity:100, visible:true, text:'构建更快更好的产品', fill:'#0f172a' },
+      { id:'cta', name:'按钮', type:'rect', bounds:{x:148,y:360,w:180,h:52}, opacity:80, visible:true, fill:'#6366f1' },
+  ]},
+];
+
+let versions = [
+  { version:1, name:'v1', timestamp:'2026-07-12 09:14', mtime:'2026-07-12 09:14', size:'2.1 MB', layers:v1Layers },
+  { version:2, name:'v2', timestamp:'2026-07-13 16:40', mtime:'2026-07-13 16:40', size:'2.3 MB', layers:v2Layers },
+  { version:3, name:'v3', timestamp:'2026-07-14 11:02', mtime:'2026-07-14 11:02', size:'2.4 MB', layers:v3Layers },
+];
+
+const futureLayerSets = [
+  [
+    { id:'bg', name:'背景', type:'group', children:[
+        { id:'bg-fill', name:'底色', type:'rect', bounds:{x:0,y:0,w:1440,h:900}, opacity:100, visible:true, fill:'#eef2ff' },
+    ]},
+    { id:'nav', name:'导航栏', type:'group', children:[
+        { id:'logo', name:'Logo', type:'image', bounds:{x:40,y:24,w:140,h:44}, opacity:100, visible:true },
+        { id:'menu', name:'菜单', type:'text', bounds:{x:880,y:30,w:420,h:28}, opacity:100, visible:true, text:'首页 产品 定价 博客 关于' },
+    ]},
+    { id:'hero', name:'主视觉', type:'group', children:[
+        { id:'title', name:'标题', type:'text', bounds:{x:148,y:220,w:600,h:64}, opacity:100, visible:true, text:'构建更快更好的产品', fill:'#0f172a' },
+        { id:'cta', name:'按钮', type:'rect', bounds:{x:148,y:360,w:180,h:52}, opacity:100, visible:true, fill:'#6366f1' },
+        { id:'badge2', name:'角标', type:'rect', bounds:{x:340,y:360,w:64,h:24}, opacity:100, visible:true, fill:'#22c55e' },
+    ]},
+  ],
+];
+let futureIdx = 0;
+
+/* ============================================================
+   把图层树序列化成纯文本行（供 side-by-side 文本 diff）
+   ============================================================ */
+function serialize(layers) {
+  const lines = [];
+  function walk(list, depth) {
+    list.forEach(l => {
+      const pad = '  '.repeat(depth);
+      lines.push({ text: `${pad}◈ ${l.name} (${l.type})`, header: true });
+      if (l.bounds) lines.push({ text: `${pad}    bounds = ${l.bounds.x},${l.bounds.y}  ${l.bounds.w}×${l.bounds.h}` });
+      if (l.opacity !== undefined) lines.push({ text: `${pad}    opacity = ${l.opacity}` });
+      if (l.visible !== undefined) lines.push({ text: `${pad}    visible = ${l.visible}` });
+      if (l.fill !== undefined) lines.push({ text: `${pad}    fill = ${l.fill}` });
+      if (l.text !== undefined) lines.push({ text: `${pad}    text = "${l.text}"` });
+      if (l.children) walk(l.children, depth + 1);
+    });
+  }
+  walk(layers, 0);
+  return lines;
+}
+
+/* LCS 行 diff，返回操作序列 */
+function lcsDiff(a, b) {
+  const n = a.length, m = b.length;
+  const dp = Array.from({length:n+1}, () => new Int32Array(m+1));
+  for (let i=n-1;i>=0;i--)
+    for (let j=m-1;j>=0;j--)
+      dp[i][j] = a[i].text === b[j].text ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j], dp[i][j+1]);
+  const ops = [];
+  let i=0,j=0;
+  while (i<n && j<m) {
+    if (a[i].text === b[j].text) { ops.push({t:'eq', l:a[i], r:b[j]}); i++; j++; }
+    else if (dp[i+1][j] >= dp[i][j+1]) { ops.push({t:'del', l:a[i]}); i++; }
+    else { ops.push({t:'ins', r:b[j]}); j++; }
+  }
+  while (i<n) { ops.push({t:'del', l:a[i++]}); }
+  while (j<m) { ops.push({t:'ins', r:b[j++]}); }
+  return ops;
+}
+
+/* 把操作序列转成 side-by-side 行（del/ins 配对显示） */
+function toSideBySide(ops) {
+  const rows = [];
+  let k = 0;
+  while (k < ops.length) {
+    const op = ops[k];
+    if (op.t === 'eq') { rows.push({ left:op.l, right:op.r, cls:'eq' }); k++; continue; }
+    // 收集连续的 del 与 ins
+    const dels = [], inses = [];
+    while (k < ops.length && (ops[k].t === 'del' || ops[k].t === 'ins')) {
+      if (ops[k].t === 'del') dels.push(ops[k].l); else inses.push(ops[k].r);
+      k++;
+    }
+    const max = Math.max(dels.length, inses.length);
+    for (let x=0; x<max; x++) {
+      rows.push({ left: dels[x] || null, right: inses[x] || null, cls:'chg' });
+    }
+  }
+  return rows;
+}
+
+function countChanges(rows) {
+  let add=0, del=0;
+  rows.forEach(r => {
+    if (r.cls === 'eq') return;
+    if (r.left) del++;
+    if (r.right) add++;
+  });
+  return { add, del };
+}
+
+/* 相邻版本的简要计数（用于 timeline 摘要 chip） */
+function adjSummary(idx) {
+  if (idx === 0) return null;
+  const rows = toSideBySide(lcsDiff(serialize(versions[idx-1].layers), serialize(versions[idx].layers)));
+  return countChanges(rows);
+}
+
+/* ============================================================
+   渲染
+   ============================================================ */
+const overlay = document.getElementById('overlay');
+const timelineView = document.getElementById('timelineView');
+const diffDock = document.getElementById('diffDock');
+const diffTag = document.getElementById('diffTag');
+
+let diffBaseIdx = null; // 当前处于 diff 模式对比的 base 版本下标
+
+function latest() { return versions[versions.length - 1]; }
+
+function renderTimeline() {
+  timelineView.innerHTML = '';
+  for (let i = versions.length - 1; i >= 0; i--) {
+    const v = versions[i];
+    const isLatest = i === versions.length - 1;
+    const item = document.createElement('div');
+    item.className = 'tl-item' + (isLatest ? ' latest' : '') + (i === diffBaseIdx ? ' active' : '');
+    let chipsHtml;
+    if (i === 0) chipsHtml = `<span style="color:#9ca3af">初始版本</span>`;
+    else {
+      const s = adjSummary(i);
+      const chips = [];
+      if (s.add) chips.push(`<span class="chip add">+${s.add} 行新增</span>`);
+      if (s.del) chips.push(`<span class="chip del">-${s.del} 行删除</span>`);
+      chipsHtml = chips.length ? chips.join('') : `<span style="color:#9ca3af">无变化</span>`;
+    }
+    item.innerHTML = `
+      <span class="tl-dot"></span>
+      <div class="tl-row">
+        <span class="tl-name">${v.name}</span>
+        ${isLatest ? '<span class="tl-latest-tag">最新</span>' : ''}
+        <span class="tl-time">${v.timestamp}</span>
+      </div>
+      <div class="tl-summary">${chipsHtml}</div>
+      <div class="tl-cta">${isLatest ? '当前工作版本' : `对比该版本与最新版 ${latest().name} →`}</div>`;
+    item.onclick = () => {
+      if (isLatest) { showToast('这是最新版本，即你当前编辑的内容'); return; }
+      enterDiffMode(i);
+    };
+    timelineView.appendChild(item);
+  }
+}
+
+/* 进入 diff 模式：关闭 modal、显示 tag、打开右侧 dock */
+function enterDiffMode(baseIdx) {
+  diffBaseIdx = baseIdx;
+  const base = versions[baseIdx];
+  closeModal();
+
+  // tag
+  document.getElementById('diffTagText').textContent = `${base.name}（${base.timestamp}）`;
+  diffTag.classList.add('show');
+
+  // dock
+  document.getElementById('dockTitle').textContent = `图层 Diff · ${base.name} → 当前`;
+  document.getElementById('colL').textContent = `${base.name}（${base.timestamp}）`;
+  renderDiff(baseIdx);
+  diffDock.classList.add('open');
+}
+
+function renderDiff(baseIdx) {
+  const base = versions[baseIdx];
+  const rows = toSideBySide(lcsDiff(serialize(base.layers), serialize(latest().layers)));
+  const c = countChanges(rows);
+  document.getElementById('dockCounts').innerHTML =
+    `<span class="cadd">+${c.add}</span> / <span class="cdel">-${c.del}</span> 行`;
+
+  const body = document.getElementById('diffBody');
+  body.innerHTML = '';
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    const isHdr = (r.cls === 'eq' && r.left && r.left.header);
+    if (isHdr) tr.className = 'hdr';
+    const lChanged = r.cls !== 'eq' && r.left;
+    const rChanged = r.cls !== 'eq' && r.right;
+    const lText = r.left ? r.left.text : '';
+    const rText = r.right ? r.right.text : '';
+    tr.innerHTML = `
+      <td class="${r.left ? (lChanged ? 'l-del' : '') : 'empty'}">${escapeHtml(lText)}</td>
+      <td class="${r.right ? (rChanged ? 'r-add' : '') : 'empty'}">${escapeHtml(rText)}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+function exitDiffMode() {
+  diffBaseIdx = null;
+  diffTag.classList.remove('show');
+  diffDock.classList.remove('open');
+}
+
+function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ---------- modal ---------- */
+function openModal() { renderTimeline(); overlay.classList.add('show'); }
+function closeModal() { overlay.classList.remove('show'); }
+
+document.getElementById('versionIcon').onclick = openModal;
+document.getElementById('closeBtn').onclick = closeModal;
+document.getElementById('dockClose').onclick = exitDiffMode;
+document.getElementById('diffTagX').onclick = exitDiffMode;
+overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (overlay.classList.contains('show')) closeModal(); else if (diffDock.classList.contains('open')) exitDiffMode(); }
+});
+
+/* ---------- header ---------- */
+function refreshHeader() {
+  const lv = latest();
+  document.getElementById('versionBadge').textContent = lv.name;
+  document.getElementById('fileSub').textContent = `最新 ${lv.name} · ${countLayers(lv.layers)} 图层 · ${lv.size}`;
+}
+function countLayers(layers){ let n=0; layers.forEach(l=>{n++; if(l.children) n+=countLayers(l.children);}); return n; }
+
+/* ---------- 模拟聚焦 ---------- */
+document.getElementById('btnChange').onclick = () => {
+  const set = futureLayerSets[futureIdx % futureLayerSets.length];
+  futureIdx++; versionSeq++;
+  const now = nowStr();
+  versions.push({
+    version:versionSeq, name:'v'+versionSeq, timestamp:now, mtime:now,
+    size:(2.4 + (versionSeq-3)*0.1).toFixed(1)+' MB',
+    layers: JSON.parse(JSON.stringify(set)),
+  });
+  refreshHeader();
+  showToast(`检测到内容变化 → 已创建新版本 v${versionSeq}`);
+  // 若正处于 diff 模式，右侧对比基准不变、目标自动跟随最新版刷新
+  if (diffBaseIdx !== null) renderDiff(diffBaseIdx);
+  if (overlay.classList.contains('show')) renderTimeline();
+};
+
+document.getElementById('btnNoChange').onclick = () => {
+  latest().mtime = nowStr();
+  showToast('mtime/size 变了，但图层 hash 相同 → 内容未变化，未创建新版本');
+};
+
+function nowStr() {
+  const d = new Date(); const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+refreshHeader();
+</script>
+</body>
+</html>

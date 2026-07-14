@@ -10,7 +10,42 @@ export interface PsdLayerNode {
   bounds: { left: number; top: number; right: number; bottom: number }
   width: number
   height: number
+  opacity?: number   // 0-255;缺失 ≈ 255(不透明)
+  blendMode?: string // 如 'normal'、'multiply'
+  text?: string      // 文本图层内容
+  fill?: string      // 填充色 hex 值(如 '#4f46e5')
   children?: PsdLayerNode[]
+}
+
+// 版本快照(metadata + 图层树)
+export interface VersionSnapshot {
+  id: number
+  projectId: number
+  version: number
+  label: string      // "v1"、"v2"…
+  mtime: string      // PSD 文件修改时间字符串
+  size: string       // 文件大小字符串("2.4 MB")
+  layerHash: string  // 图层树确定性 hash,用于判断内容是否真正变化
+  createdAt: string  // 快照创建时间
+}
+
+// version_snapshots 表行(含 layerTree JSON)
+export interface VersionSnapshotRow extends VersionSnapshot {
+  layerTree: string  // PsdLayerNode[] 的 JSON 序列化
+}
+
+// 两个版本间的 diff 结果
+export interface VersionDiffResult {
+  baseVersion: number
+  targetVersion: number
+  lines: VersionDiffLine[]
+  summary: { add: number; del: number; mod: number }
+}
+
+export interface VersionDiffLine {
+  left: string | null   // base 侧文本行;null = 新增行无对应
+  right: string | null  // target 侧文本行;null = 删除行无对应
+  type: 'eq' | 'chg'    // eq=无变化,chg=删除或新增
 }
 
 export interface PsdMeta {

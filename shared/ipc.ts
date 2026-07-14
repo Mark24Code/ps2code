@@ -69,7 +69,12 @@ export const IPC = {
   readFileAsDataUrl: 'app:readFileAsDataUrl',
 
   // 窗口重新聚焦(用户可能在 PS 编辑后切回,用于自动刷新)
-  windowFocused: 'app:windowFocused'
+  windowFocused: 'app:windowFocused',
+
+  // 版本管理
+  versionsCheck: 'versions:check',
+  versionsList: 'versions:list',
+  versionsDiff: 'versions:diff',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

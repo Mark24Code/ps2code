@@ -10,6 +10,7 @@ import * as db from './services/db'
 import { readPsdMeta } from './services/psd'
 import { buildLayerCache, getLayerMeta } from './services/psd/layerCache'
 import { buildLayoutManifest, type ExportMetaEntry } from './services/psd/layout'
+import * as versionService from './services/version'
 import { getBridge } from './services/photoshop'
 import { ensureDesignReady, testConnection } from './services/photoshop/operations'
 import { cancelAgent, checkAgentConfig, resolveConfirm, runAgent } from './services/agent'
@@ -292,4 +293,16 @@ export function registerIpc(): void {
 
   // ---------- 更新 ----------
   ipcMain.handle(IPC.checkUpdate, () => checkUpdate())
+
+  // ---------- 版本管理 ----------
+  // 检查 PSD 是否变化(聚焦触发):stat → hash → 变化则创建新版本
+  ipcMain.handle(IPC.versionsCheck, async (_e, projectId: number) =>
+    versionService.createSnapshot(projectId)
+  )
+  ipcMain.handle(IPC.versionsList, (_e, projectId: number) =>
+    versionService.listVersions(projectId)
+  )
+  ipcMain.handle(IPC.versionsDiff, (_e, projectId: number, baseVersion: number) =>
+    versionService.getDiff(projectId, baseVersion)
+  )
 }
