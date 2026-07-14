@@ -1,11 +1,14 @@
 #!/bin/bash
-# 导出 PSD 中指定图层组为 PNG
+# 导出 PSD 中指定图层为 PNG(按 PSD 原生 id 精确定位)
 #
 # 用法:
-#   ./scripts/export-groups.sh --psd <path> --names <name1,name2> --output-dir <dir> [--parent <name>] [--1x] [--2x] [--trim]
+#   ./scripts/export-groups.sh --psd <path> --targets-file <json> --output-dir <dir> [--1x] [--2x] [--trim]
+#
+# targets-file: JSON 数组 [{ "psId": 12, "name": "叶子名", "exportName": "叶子名_12" }, ...]
+#   psId 缺失时按 name 回退定位;exportName 为最终文件名基名(叶子名_节点id)。
 #
 # 依赖: Adobe Photoshop (macOS)
-# 输出: stdout 输出 JSON { ok, data:{files,matched,ok,err,outputDir}, log, error }
+# 输出: stdout 输出 JSON { ok, data:{files,meta,matched,ok,err,outputDir}, log, error }
 
 set -euo pipefail
 
@@ -13,25 +16,23 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ---- 默认值 ----
 PSD_PATH=""
-NAMES=""
+TARGETS_FILE=""
 OUTPUT_DIR=""
 OPT_X1="false"
 OPT_X2="false"
 OPT_TRIM="false"
-PARENT=""
 
 # ---- 解析参数 ----
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --psd) PSD_PATH="$2"; shift 2 ;;
-        --names) NAMES="$2"; shift 2 ;;
+        --targets-file) TARGETS_FILE="$2"; shift 2 ;;
         --output-dir) OUTPUT_DIR="$2"; shift 2 ;;
-        --parent) PARENT="$2"; shift 2 ;;
         --1x) OPT_X1="true"; shift ;;
         --2x) OPT_X2="true"; shift ;;
         --trim) OPT_TRIM="true"; shift ;;
         --help|-h)
-            echo "用法: $0 --psd <path> --names <name1,name2> --output-dir <dir> [--parent <name>] [--1x] [--2x] [--trim]"
+            echo "用法: $0 --psd <path> --targets-file <json> --output-dir <dir> [--1x] [--2x] [--trim]"
             exit 0
             ;;
         *) echo "未知参数: $1"; exit 1 ;;
@@ -43,8 +44,12 @@ if [[ -z "$PSD_PATH" ]]; then
     echo '{"ok":false,"data":{},"log":[],"error":"缺少 --psd 参数"}'
     exit 1
 fi
-if [[ -z "$NAMES" ]]; then
-    echo '{"ok":false,"data":{},"log":[],"error":"缺少 --names 参数"}'
+if [[ -z "$TARGETS_FILE" ]]; then
+    echo '{"ok":false,"data":{},"log":[],"error":"缺少 --targets-file 参数"}'
+    exit 1
+fi
+if [[ ! -f "$TARGETS_FILE" ]]; then
+    echo '{"ok":false,"data":{},"log":[],"error":"targets 文件不存在"}'
     exit 1
 fi
 if [[ -z "$OUTPUT_DIR" ]]; then
@@ -60,11 +65,10 @@ fi
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 
-echo "=== 导出图层组 ===" >&2
+echo "=== 导出图层(按 id 定位) ===" >&2
 echo "PSD : $PSD_PATH" >&2
-echo "图层组: $NAMES" >&2
+echo "targets: $TARGETS_FILE" >&2
 echo "输出: $OUTPUT_DIR" >&2
-echo "父组: ${PARENT:-(无)}" >&2
 echo "1x: $OPT_X1  2x: $OPT_X2  trim: $OPT_TRIM" >&2
 echo "" >&2
 
@@ -73,31 +77,8 @@ _escape_sed() {
     printf '%s\n' "$1" | sed 's/[\|&]/\\&/g'
 }
 
-# ---- 将逗号分隔的名称转为 JS 数组字面量 ----
-_build_js_array() {
-    local result="["
-    local first=true
-    # 保存原 IFS
-    local OLD_IFS="$IFS"
-    IFS=','
-    for name in $1; do
-        # 去除前后空白
-        name="$(printf '%s' "$name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-        # 转义单引号(图层名中极少出现,但做预防)
-        local escaped="${name//\'/\'\\\'\'}"
-        if $first; then
-            result="${result}'${escaped}'"
-            first=false
-        else
-            result="${result},'${escaped}'"
-        fi
-    done
-    IFS="$OLD_IFS"
-    result="${result}]"
-    printf '%s' "$result"
-}
-
-NAMES_JS="$(_build_js_array "$NAMES")"
+# targets JSON 原文(作为 JS 字面量注入)
+TARGETS_JSON="$(cat "$TARGETS_FILE")"
 
 # ---- 临时文件 ----
 TMP_JSX="/tmp/ps2code-export-groups.$$.jsx"
@@ -105,18 +86,15 @@ TMP_AS="/tmp/ps2code-export-groups.$$.applescript"
 trap 'rm -f "$TMP_JSX" "$TMP_AS"' EXIT
 
 # ---- 生成 JSX (自包含,无外部依赖) ----
-# 注意: heredoc 使用 'JSXEOF' (单引号定界) 阻止 shell 变量展开,
-#       所有占位符后续由 sed 替换。
 cat > "$TMP_JSX" << 'JSXEOF'
 (function(){
     // ---- 占位符(由 sed 替换为实际值) ----
     var PSD_PATH  = 'PSD_PATH_PLACEHOLDER';
     var OUT_DIR   = 'OUT_DIR_PLACEHOLDER';
-    var NAMES     = NAMES_PLACEHOLDER;
+    var TARGETS   = TARGETS_PLACEHOLDER;   // [{ psId?, name, exportName }]
     var OPT_X1    = X1_PLACEHOLDER;
     var OPT_X2    = X2_PLACEHOLDER;
     var OPT_TRIM  = TRIM_PLACEHOLDER;
-    var PARENT    = 'PARENT_PLACEHOLDER';
 
     // ---- 最小 PS2 辅助(无需外部 _common.jsxinc) ----
     var PS2 = {};
@@ -153,12 +131,12 @@ cat > "$TMP_JSX" << 'JSXEOF'
 
     var origUnit = app.preferences.rulerUnits;
     app.preferences.rulerUnits = Units.PIXELS;
+    var doc = null;
+    var didOpen = false;
     try {
-        // 1. 打开或复用文档(如果 PSD 已在 PS 中打开则复用,避免 "file already open" 错误)
+        // 1. 打开或复用文档
         var f = new File(PSD_PATH);
         if (!f.exists) throw new Error('文件不存在: ' + PSD_PATH);
-        var doc = null;
-        var didOpen = false;
         for (var di = 0; di < app.documents.length; di++) {
             try {
                 if (app.documents[di].fullName && app.documents[di].fullName.fsName === f.fsName) {
@@ -167,67 +145,50 @@ cat > "$TMP_JSX" << 'JSXEOF'
                 }
             } catch(e2) {}
         }
-        if (doc === null) {
-            doc = app.open(f);
-            didOpen = true;
-        }
+        if (doc === null) { doc = app.open(f); didOpen = true; }
         app.activeDocument = doc;
         PS2._push("已打开: " + doc.name);
 
-        // 2. 递归查找图层组
-        // 全局搜索(深度优先,返回第一个匹配)
-        function findLayerSet(container, name) {
+        // 2. 按 PSD 原生 id 选中图层(嵌套组内同样有效),失败返回 null
+        function selectLayerById(layerId) {
+            try {
+                var ref = new ActionReference();
+                ref.putIdentifier(charIDToTypeID("Lyr "), layerId);
+                var desc = new ActionDescriptor();
+                desc.putReference(charIDToTypeID("null"), ref);
+                desc.putBoolean(charIDToTypeID("MkVs"), false);
+                executeAction(charIDToTypeID("slct"), desc, DialogModes.NO);
+                return doc.activeLayer;
+            } catch (e) { return null; }
+        }
+        // 回退:按名递归查找第一个匹配图层/组
+        function findAnyByName(container, name) {
             for (var i = 0; i < container.layers.length; i++) {
                 var l = container.layers[i];
-                if (l.typename === 'LayerSet' && l.name === name) return l;
+                if (l.name === name) return l;
                 if (l.typename === 'LayerSet') {
-                    var r = findLayerSet(l, name);
+                    var r = findAnyByName(l, name);
                     if (r) return r;
                 }
             }
             return null;
-        }
-        // 递归查找第一个匹配名称的父组
-        function findParentRecursive(container, name) {
-            for (var i = 0; i < container.layers.length; i++) {
-                var l = container.layers[i];
-                if (l.typename === 'LayerSet' && l.name === name) return l;
-                if (l.typename === 'LayerSet') {
-                    var r = findParentRecursive(l, name);
-                    if (r) return r;
-                }
-            }
-            return null;
-        }
-        // 在容器内递归查找所有匹配名称的子组(返回数组)
-        function findAllChildSetsByName(container, name) {
-            var result = [];
-            for (var i = 0; i < container.layers.length; i++) {
-                var l = container.layers[i];
-                if (l.typename === 'LayerSet') {
-                    if (l.name === name) result.push(l);
-                    result = result.concat(findAllChildSetsByName(l, name));
-                }
-            }
-            return result;
         }
 
-        // 2.5 检查文件系统是否存在同名 .png,自动递增序号避免覆盖
+        // 2.5 文件系统防覆盖:同名 .png 自动递增序号
         function resolveUniqueName(dir, baseName) {
-            var f = new File(dir + '/' + baseName + '.png');
-            if (!f.exists) return baseName;
+            var uf = new File(dir + '/' + baseName + '.png');
+            if (!uf.exists) return baseName;
             var seq = 1;
             while (true) {
                 var seqStr = String(seq);
                 while (seqStr.length < 2) seqStr = "0" + seqStr;
                 var candidate = baseName + '_' + seqStr;
-                f = new File(dir + '/' + candidate + '.png');
-                if (!f.exists) return candidate;
+                uf = new File(dir + '/' + candidate + '.png');
+                if (!uf.exists) return candidate;
                 seq++;
             }
         }
 
-        // 3. 导出为 PNG(SAVEFORWEB,与 export-group-84.sh 一致)
         function exportPng(targetDoc, filePath) {
             var outFile = new File(filePath);
             var outDir = new Folder(outFile.parent.fsName);
@@ -246,23 +207,20 @@ cat > "$TMP_JSX" << 'JSXEOF'
         var meta = [];
         var ok = 0, err = 0;
 
-        // 4. 导出辅助函数(将一组 -> 导出为 PNG)
-        function exportOneGroup(groupLayer, exportName) {
-            // 检查文件系统,避免覆盖已有文件
+        // 导出单个图层/组:layerObj 已选中为 activeLayer,exportName 为最终基名
+        function exportOne(layerObj, exportName) {
             var uniqueName = resolveUniqueName(OUT_DIR, exportName);
             if (uniqueName !== exportName) PS2._push("  文件已存在,重命名为: " + uniqueName);
             var saved = [];
-            PS2._push("--- 处理: " + groupLayer.name + (uniqueName !== groupLayer.name ? " -> " + uniqueName : ""));
+            PS2._push("--- 处理: " + layerObj.name + " -> " + uniqueName);
 
-            // 4a. 复制 -> 智能对象
-            doc.activeLayer = groupLayer;
-            var dup = groupLayer.duplicate();
+            doc.activeLayer = layerObj;
+            var dup = layerObj.duplicate();
             doc.activeLayer = dup;
             executeAction(stringIDToTypeID('newPlacedLayer'), undefined, DialogModes.NO);
             var sm = doc.activeLayer;
             PS2._push("  已转为智能对象");
 
-            // 4b. 记录原始边界和尺寸
             var b = sm.bounds;
             var w = Math.ceil(b[2].value - b[0].value);
             var h = Math.ceil(b[3].value - b[1].value);
@@ -270,12 +228,11 @@ cat > "$TMP_JSX" << 'JSXEOF'
             var gy = Math.round(b[1].value);
             PS2._push("  图层尺寸: " + w + " x " + h + " px  @" + gx + "," + gy);
             if (w <= 0 || h <= 0) {
-                PS2._push("  跳过: 图层组为空或全部隐藏");
+                PS2._push("  跳过: 图层为空或全部隐藏");
                 sm.remove();
                 return null;
             }
 
-            // 4c. 创建临时文档
             var td = app.documents.add(
                 Math.ceil(doc.width.value), Math.ceil(doc.height.value), 72,
                 '_tmp_' + uniqueName, NewDocumentMode.RGB, DocumentFill.TRANSPARENT
@@ -285,7 +242,6 @@ cat > "$TMP_JSX" << 'JSXEOF'
             try { sm.remove(); } catch(e2) {}
             app.activeDocument = td;
 
-            // 4d. 裁剪
             if (OPT_TRIM) {
                 try {
                     td.trim(TrimType.TRANSPARENT, true, true, true, true);
@@ -295,22 +251,13 @@ cat > "$TMP_JSX" << 'JSXEOF'
                 }
             }
 
-            // 4e. 导出 1x
             if (OPT_X1) {
                 var f1x = exportPng(td, OUT_DIR + '/' + uniqueName + '.png');
                 PS2._push("  ✓ 1x PNG: " + f1x.fsName);
                 saved.push(f1x.fsName);
-                meta.push({
-                    file: f1x.name,
-                    group: groupLayer.name,
-                    w: Math.ceil(td.width.value),
-                    h: Math.ceil(td.height.value),
-                    x: gx,
-                    y: gy
-                });
+                meta.push({ file: f1x.name, group: layerObj.name, w: Math.ceil(td.width.value), h: Math.ceil(td.height.value), x: gx, y: gy });
             }
 
-            // 4f. 导出 2x
             if (OPT_X2) {
                 var tw = Math.ceil(td.width.value);
                 var th = Math.ceil(td.height.value);
@@ -325,14 +272,7 @@ cat > "$TMP_JSX" << 'JSXEOF'
                 var f2x = exportPng(td, OUT_DIR + '/' + uniqueName + '@2x.png');
                 PS2._push("  ✓ 2x PNG: " + f2x.fsName);
                 saved.push(f2x.fsName);
-                meta.push({
-                    file: f2x.name,
-                    group: groupLayer.name,
-                    w: Math.ceil(td.width.value),
-                    h: Math.ceil(td.height.value),
-                    x: gx,
-                    y: gy
-                });
+                meta.push({ file: f2x.name, group: layerObj.name, w: Math.ceil(td.width.value), h: Math.ceil(td.height.value), x: gx, y: gy });
             }
 
             td.close(SaveOptions.DONOTSAVECHANGES);
@@ -341,67 +281,32 @@ cat > "$TMP_JSX" << 'JSXEOF'
             return saved;
         }
 
-        // 5. 逐个导出(支持 PARENT 限定范围)
-        if (PARENT && PARENT.length > 0) {
-            PS2._push("=== 限定父组: " + PARENT + " ===");
-            var parentGroup = findParentRecursive(doc, PARENT);
-            if (!parentGroup) {
-                PS2._push("未找到父组 '" + PARENT + "', 跳过导出");
-            } else {
-                for (var gi = 0; gi < NAMES.length; gi++) {
-                    var groupName = NAMES[gi];
-                    try {
-                        var childGroups = findAllChildSetsByName(parentGroup, groupName);
-                        if (childGroups.length === 0) {
-                            PS2._push("在 '" + PARENT + "' 下未找到 '" + groupName + "', 跳过");
-                            err++;
-                            continue;
-                        }
-                        for (var cgi = 0; cgi < childGroups.length; cgi++) {
-                            var exportName = groupName;
-                            if (childGroups.length > 1) {
-                                var seq = String(cgi + 1);
-                                while (seq.length < 2) seq = "0" + seq;
-                                exportName = groupName + "_" + seq;
-                            }
-                            var saved = exportOneGroup(childGroups[cgi], exportName);
-                            if (saved && saved.length > 0) {
-                                for (var fi = 0; fi < saved.length; fi++) files.push(saved[fi]);
-                                ok++;
-                            } else {
-                                err++;
-                            }
-                        }
-                    } catch(e) {
-                        err++;
-                        PS2._push("✕ 失败 [" + groupName + "]: " + e.message + (e.line ? " (line " + e.line + ")" : ""));
-                        try { app.activeDocument = doc; } catch(e2) {}
-                    }
+        // 3. 逐个目标导出(按 psId 定位,回退按名)
+        for (var i = 0; i < TARGETS.length; i++) {
+            var t = TARGETS[i];
+            try {
+                var layerObj = null;
+                if (typeof t.psId === "number" && t.psId > 0) {
+                    layerObj = selectLayerById(t.psId);
+                    if (!layerObj) PS2._push("  按 id " + t.psId + " 未定位到,回退按名 '" + t.name + "'");
                 }
-            }
-        } else {
-            for (var gi = 0; gi < NAMES.length; gi++) {
-                var groupName = NAMES[gi];
-                try {
-                    PS2._push("--- 处理: " + groupName);
-                    var g = findLayerSet(doc, groupName);
-                    if (!g) {
-                        PS2._push("  未找到图层组 '" + groupName + "', 跳过");
-                        err++;
-                        continue;
-                    }
-                    var saved = exportOneGroup(g, groupName);
-                    if (saved && saved.length > 0) {
-                        for (var fi = 0; fi < saved.length; fi++) files.push(saved[fi]);
-                        ok++;
-                    } else {
-                        err++;
-                    }
-                } catch(e) {
+                if (!layerObj) layerObj = findAnyByName(doc, t.name);
+                if (!layerObj) {
+                    PS2._push("✕ 未找到目标: " + t.name + " (id=" + t.psId + ")");
                     err++;
-                    PS2._push("✕ 失败 [" + groupName + "]: " + e.message + (e.line ? " (line " + e.line + ")" : ""));
-                    try { app.activeDocument = doc; } catch(e2) {}
+                    continue;
                 }
+                var saved = exportOne(layerObj, t.exportName);
+                if (saved && saved.length > 0) {
+                    for (var fi = 0; fi < saved.length; fi++) files.push(saved[fi]);
+                    ok++;
+                } else {
+                    err++;
+                }
+            } catch(e) {
+                err++;
+                PS2._push("✕ 失败 [" + t.exportName + "]: " + e.message + (e.line ? " (line " + e.line + ")" : ""));
+                try { app.activeDocument = doc; } catch(e2) {}
             }
         }
 
@@ -411,7 +316,7 @@ cat > "$TMP_JSX" << 'JSXEOF'
 
         return PS2.result(true, { files: files, meta: meta, matched: ok + err, ok: ok, err: err, outputDir: OUT_DIR });
     } catch(e) {
-        if (didOpen) try { doc.close(SaveOptions.DONOTSAVECHANGES); } catch(e2) {}
+        if (didOpen && doc) try { doc.close(SaveOptions.DONOTSAVECHANGES); } catch(e2) {}
         return PS2.result(false, {}, e.message + (e.line ? " (line " + e.line + ")" : ""));
     } finally {
         app.preferences.rulerUnits = origUnit;
@@ -422,16 +327,14 @@ JSXEOF
 # ---- sed 注入占位符 ----
 PSD_PATH_ESC="$(_escape_sed "$PSD_PATH")"
 OUT_DIR_ESC="$(_escape_sed "$OUTPUT_DIR")"
-NAMES_JS_ESC="$(_escape_sed "$NAMES_JS")"
-PARENT_ESC="$(_escape_sed "$PARENT")"
+TARGETS_ESC="$(_escape_sed "$TARGETS_JSON")"
 
 sed -i '' "s|PSD_PATH_PLACEHOLDER|$PSD_PATH_ESC|g"   "$TMP_JSX"
 sed -i '' "s|OUT_DIR_PLACEHOLDER|$OUT_DIR_ESC|g"     "$TMP_JSX"
-sed -i '' "s|NAMES_PLACEHOLDER|$NAMES_JS_ESC|g"      "$TMP_JSX"
+sed -i '' "s|TARGETS_PLACEHOLDER|$TARGETS_ESC|g"     "$TMP_JSX"
 sed -i '' "s|X1_PLACEHOLDER|$OPT_X1|g"               "$TMP_JSX"
 sed -i '' "s|X2_PLACEHOLDER|$OPT_X2|g"               "$TMP_JSX"
 sed -i '' "s|TRIM_PLACEHOLDER|$OPT_TRIM|g"           "$TMP_JSX"
-sed -i '' "s|PARENT_PLACEHOLDER|$PARENT_ESC|g"       "$TMP_JSX"
 
 # ---- 检测 Photoshop 应用名 ----
 source "$SCRIPT_DIR/lib/detect-ps.sh"

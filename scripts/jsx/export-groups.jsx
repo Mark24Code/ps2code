@@ -13,84 +13,30 @@
         if (!exportDir.exists) exportDir.create();
         PS2._push("输出目录: " + exportDir.fsName);
 
-        var matched = [];
+        // ---- 目标定位:优先按 psId 精确定位,回退按名 ----
+        // p.targets: [{ psId?, name, exportName }]
+        var targets = p.targets || [];
+        PS2._push("导出目标数: " + targets.length);
+        if (targets.length === 0) return PS2.result(true, { files: [], matched: 0, ok: 0, err: 0 });
 
-        // 当指定了 parent，仅在父组范围内搜索
-        if (p.parent && p.parent.length > 0) {
-            PS2._push("限定父组: " + p.parent);
-            var parentGroup = PS2.findParentRecursive(doc, p.parent);
-            if (!parentGroup) {
-                PS2._push("未找到父组 '" + p.parent + "'");
-                return PS2.result(true, { files: [], matched: 0, ok: 0, err: 0 });
+        // 解析每个 target 为实际图层对象 + 导出基名(exportName 已由 Node 预计算为 叶子名_节点id)。
+        var matched = []; // { layer, exportName }
+        for (var ti = 0; ti < targets.length; ti++) {
+            var t = targets[ti];
+            var layer = null;
+            if (typeof t.psId === "number" && t.psId > 0) {
+                layer = PS2.selectLayerById(doc, t.psId);
+                if (!layer) PS2._push("  按 id " + t.psId + " 未定位到,回退按名 '" + t.name + "'");
             }
-            var childGroups = PS2.findAllLayerSets(parentGroup);
-            PS2._push("父组下共 " + childGroups.length + " 个子图层组");
-
-            var useRegex = p.pattern && p.pattern.length > 0;
-            var regex = useRegex ? new RegExp(p.pattern) : null;
-            // names 精确匹配
-            if (p.names && p.names.length) {
-                for (var ni = 0; ni < p.names.length; ni++) {
-                    var found = PS2.findAllChildSetsByName(parentGroup, p.names[ni]);
-                    for (var fi = 0; fi < found.length; fi++) {
-                        // 去重
-                        var dup = false;
-                        for (var di = 0; di < matched.length; di++) {
-                            if (matched[di] === found[fi]) { dup = true; break; }
-                        }
-                        if (!dup) matched.push(found[fi]);
-                    }
-                }
+            if (!layer) layer = PS2.findAnyByName(doc, t.name);
+            if (!layer) {
+                PS2._push("✕ 未找到目标: " + t.name + " (id=" + t.psId + ")");
+                continue;
             }
-            // pattern 正则匹配
-            if (useRegex) {
-                for (var gi = 0; gi < childGroups.length; gi++) {
-                    if (regex.test(childGroups[gi].name)) {
-                        var dup = false;
-                        for (var di = 0; di < matched.length; di++) {
-                            if (matched[di] === childGroups[gi]) { dup = true; break; }
-                        }
-                        if (!dup) matched.push(childGroups[gi]);
-                    }
-                }
-            }
-        } else {
-            // 无 parent 时全局搜索（向后兼容）
-            var allGroups = PS2.findAllLayerSets(doc);
-            PS2._push("文档共 " + allGroups.length + " 个图层组");
-
-            var useRegex = p.pattern && p.pattern.length > 0;
-            var nameSet = {};
-            if (p.names && p.names.length) {
-                for (var ni = 0; ni < p.names.length; ni++) nameSet[p.names[ni]] = true;
-            }
-            var regex = useRegex ? new RegExp(p.pattern) : null;
-            for (var i = 0; i < allGroups.length; i++) {
-                var nm = allGroups[i].name;
-                var hit = false;
-                if (regex && regex.test(nm)) hit = true;
-                if (nameSet[nm]) hit = true;
-                if (hit) matched.push(allGroups[i]);
-            }
+            matched.push({ layer: layer, exportName: t.exportName });
         }
-        PS2._push("匹配到 " + matched.length + " 个图层组");
+        PS2._push("定位到 " + matched.length + " 个图层");
         if (matched.length === 0) return PS2.result(true, { files: [], matched: 0, ok: 0, err: 0 });
-
-        // ---- 重名统计 → 追加补零序号 ----
-        var nameTotal = {};
-        for (var t = 0; t < matched.length; t++) {
-            var mn = matched[t].name;
-            nameTotal[mn] = (nameTotal[mn] || 0) + 1;
-        }
-        var nameSeq = {};
-        function makeExportName(name) {
-            if (nameTotal[name] <= 1) return name;
-            nameSeq[name] = (nameSeq[name] || 0) + 1;
-            var width = String(nameTotal[name]).length; if (width < 2) width = 2;
-            var s = String(nameSeq[name]);
-            while (s.length < width) s = "0" + s;
-            return name + "_" + s;
-        }
 
         // ---- 文件系统级防覆盖:检查输出目录是否存在同名文件,自动递增序号 ----
         function resolveUniqueName(dir, baseName) {
@@ -342,8 +288,7 @@
         var ok = 0, err = 0;
         for (var m = 0; m < matched.length; m++) {
             try {
-                var outName = makeExportName(matched[m].name);
-                var saved = exportOneGroup(matched[m], outName);
+                var saved = exportOneGroup(matched[m].layer, matched[m].exportName);
                 // 合并该组所有导出的文件路径(1x/2x,PNG/TIFF/PSD)
                 if (saved && saved.length > 0) {
                     for (var fi = 0; fi < saved.length; fi++) {
@@ -353,7 +298,7 @@
                 ok++;
             } catch (e) {
                 err++;
-                PS2._push("✕ 失败 [" + matched[m].name + "]: " + e.message + (e.line ? " (line " + e.line + ")" : ""));
+                PS2._push("✕ 失败 [" + matched[m].exportName + "]: " + e.message + (e.line ? " (line " + e.line + ")" : ""));
                 try { app.activeDocument = doc; } catch (e2) {}
             }
         }

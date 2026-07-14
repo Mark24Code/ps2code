@@ -122,6 +122,45 @@ PS2.findAllChildSetsByName = function (container, name) {
     return result;
 };
 
+// 递归遍历所有图层(含普通图层与组),对每个执行 fn
+PS2.eachLayer = function (container, fn) {
+    for (var i = 0; i < container.layers.length; i++) {
+        var l = container.layers[i];
+        fn(l);
+        if (l.typename === "LayerSet") PS2.eachLayer(l, fn);
+    }
+};
+
+// 按 PSD 原生 id(lyid)选中图层,并返回对应的 ArtLayer/LayerSet。
+// 通过 ActionManager 选中 layerID,再读 activeLayer(在嵌套组里同样有效)。
+// 失败(id 不存在/旧版 PS 不支持)返回 null。
+PS2.selectLayerById = function (doc, layerId) {
+    try {
+        var ref = new ActionReference();
+        ref.putIdentifier(charIDToTypeID("Lyr "), layerId);
+        var desc = new ActionDescriptor();
+        desc.putReference(charIDToTypeID("null"), ref);
+        desc.putBoolean(charIDToTypeID("MkVs"), false);
+        executeAction(charIDToTypeID("slct"), desc, DialogModes.NO);
+        return doc.activeLayer;
+    } catch (e) {
+        return null;
+    }
+};
+
+// 按名称在文档内查找第一个匹配的图层/组(psId 缺失时的回退定位)。
+PS2.findAnyByName = function (container, name) {
+    for (var i = 0; i < container.layers.length; i++) {
+        var l = container.layers[i];
+        if (l.name === name) return l;
+        if (l.typename === "LayerSet") {
+            var r = PS2.findAnyByName(l, name);
+            if (r) return r;
+        }
+    }
+    return null;
+};
+
 // 解析 Bridge 注入的参数
 PS2.params = function () {
     if (typeof PS2CODE_PARAMS === "undefined") return {};

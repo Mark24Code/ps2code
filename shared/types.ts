@@ -2,6 +2,8 @@
 
 export interface PsdLayerNode {
   id: string // 路径式稳定 id,如 "0/2/1"
+  psId?: number // PSD 原生图层 id(lyid);用于在 Photoshop 中精确定位。可能缺失(旧 PSD/未写入)
+  path: string // 图层名链路径,如 "根组/x默认/1"(用于展示与确认)
   name: string
   kind: 'group' | 'layer'
   hidden: boolean

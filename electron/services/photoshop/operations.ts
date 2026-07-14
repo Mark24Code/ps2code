@@ -78,15 +78,49 @@ export function mutateLayers(targetPath: string, ops: LayerOp[]): Promise<JsxRes
   return runScript('mutate-layers.jsx', { targetPath, ops })
 }
 
+// 单个导出目标:psId 用于在 PS 中精确定位(缺失则回退按名),
+// exportName 为最终文件名基名(叶子名_节点id,已做非法字符清洗)。
+export interface ExportTargetParam {
+  psId?: number
+  name: string // 末端叶子图层/组名(psId 缺失时按此名定位)
+  exportName: string // 文件名基名:叶子名_节点id
+}
+
 export interface ExportParams {
   targetPath: string
-  pattern?: string
-  names?: string[]
-  parent?: string  // 限定搜索范围:只在指定父组下查找
+  targets: ExportTargetParam[]
   x1: boolean
   x2: boolean
   trim: boolean
   outputDir: string
+}
+
+// 从 agentTools 传入的原始目标(含 path/id/psId)。
+export interface RawExportTarget {
+  psId?: number
+  path: string
+  id: string
+  name: string
+}
+
+// 文件名清洗:去掉路径分隔符与非法字符(A/B/C → A_B_C)。
+function sanitizeForFileName(s: string): string {
+  return s.replace(/[/\\:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim()
+}
+
+// 命名规则:叶子名_节点id。
+//  - 有 psId:  叶子名_<psId>
+//  - 无 psId:  叶子名_<路径式id,'/'→'_'>(保证唯一)
+export function makeExportName(t: RawExportTarget): string {
+  const leaf = sanitizeForFileName(t.name)
+  const idPart =
+    typeof t.psId === 'number' && t.psId > 0 ? String(t.psId) : sanitizeForFileName(t.id.replace(/\//g, '_'))
+  return `${leaf}_${idPart}`
+}
+
+// 把 agentTools 的 targets 转成脚本需要的 ExportTargetParam(预计算 exportName)。
+export function toExportTargetParams(targets: RawExportTarget[]): ExportTargetParam[] {
+  return targets.map((t) => ({ psId: t.psId, name: t.name, exportName: makeExportName(t) }))
 }
 
 // macOS: 使用 shell 脚本(自包含 JSX + sed + osascript)导出图层组。
@@ -106,41 +140,26 @@ async function exportGroupsViaShell(
     await mkdir(outputDir, { recursive: true })
   }
 
-  // 解析 names:优先用传入的 names,否则用 pattern 从 PSD 元数据匹配
-  let names = params.names || []
-  if (names.length === 0 && params.pattern) {
-    try {
-      const meta = await readPsdMeta(params.targetPath)
-      const regex = new RegExp(params.pattern)
-      const walk = (nodes: typeof meta.tree): string[] => {
-        const result: string[] = []
-        for (const n of nodes) {
-          if (n.kind === 'group' && regex.test(n.name)) result.push(n.name)
-          if ((n as any).children) result.push(...walk((n as any).children))
-        }
-        return result
-      }
-      names = walk(meta.tree)
-    } catch (e) {
-      return { ok: false, data: { files: [], matched: 0, ok: 0, err: 0, outputDir: outputDir }, log: [], error: `无法读取 PSD 元数据: ${(e as Error).message}` }
-    }
+  if (!params.targets || params.targets.length === 0) {
+    return { ok: false, data: { files: [], matched: 0, ok: 0, err: 0, outputDir: outputDir }, log: [], error: '没有可导出的目标(请先用 search_layers 定位)' }
   }
 
-  if (names.length === 0) {
-    return { ok: false, data: { files: [], matched: 0, ok: 0, err: 0, outputDir: outputDir }, log: [], error: '没有匹配的图层组(请先用 list_layers 查询,或提供 names/pattern 参数)' }
-  }
+  // 目标(含 psId + 预计算 exportName)通过临时 JSON 文件传给 shell 脚本,避免 sed 注入结构化数据的脆弱性。
+  const { writeFile, unlink } = await import('fs/promises')
+  const { randomUUID } = await import('crypto')
+  const { tmpdir } = await import('os')
+  const targetsFile = join(tmpdir(), `ps2code-targets.${randomUUID()}.json`)
+  await writeFile(targetsFile, JSON.stringify(params.targets), 'utf8')
 
   const scriptPath = join(scriptsDir(), 'export-groups.sh')
-  const namesArg = names.join(',')
   const args = [
     `--psd "${params.targetPath}"`,
-    `--names "${namesArg}"`,
+    `--targets-file "${targetsFile}"`,
     `--output-dir "${outputDir}"`
   ]
   if (params.x1) args.push('--1x')
   if (params.x2) args.push('--2x')
   if (params.trim) args.push('--trim')
-  if (params.parent) args.push(`--parent "${params.parent}"`)
 
   const cmd = `bash "${scriptPath}" ${args.join(' ')}`
   try {
@@ -178,31 +197,45 @@ async function exportGroupsViaShell(
       } catch { /* fall through */ }
     }
     return { ok: false, data: { files: [], matched: 0, ok: 0, err: 0, outputDir: outputDir }, log: [], error: errMsg }
+  } finally {
+    // 清理临时 targets 文件
+    try { await unlink(targetsFile) } catch { /* ignore */ }
   }
 }
 
-// Windows: 保留原 JSX 路径(通过 _common.jsxinc + runScript)
+// Windows / 测试: JSX 路径(通过 _common.jsxinc + runScript),targets 直接进 PS2CODE_PARAMS。
 async function exportGroupsViaJsx(
   params: ExportParams
 ): Promise<JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>> {
-  return runScript('export-groups.jsx', {
-    pattern: '',
-    names: [],
-    ...params
-  })
+  return runScript('export-groups.jsx', params)
 }
 
-export function exportGroups(
-  params: ExportParams
-): Promise<JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>> {
+// 对外入口:接收 agentTools 收集的 targets(含 path/id/psId),
+// 在此计算 exportName(叶子名_节点id),再交给平台对应的脚本执行。
+export function exportGroups(params: {
+  targetPath: string
+  targets: RawExportTarget[]
+  x1: boolean
+  x2: boolean
+  trim: boolean
+  outputDir: string
+}): Promise<JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>> {
+  const resolved: ExportParams = {
+    targetPath: params.targetPath,
+    targets: toExportTargetParams(params.targets),
+    x1: params.x1,
+    x2: params.x2,
+    trim: params.trim,
+    outputDir: params.outputDir
+  }
   // 测试模式:走 JSX 路径(通过 FakeBridge,不依赖真实 Photoshop / shell)
   if (isUsingTestBridge()) {
-    return exportGroupsViaJsx(params)
+    return exportGroupsViaJsx(resolved)
   }
   if (process.platform === 'darwin') {
-    return exportGroupsViaShell(params)
+    return exportGroupsViaShell(resolved)
   }
-  return exportGroupsViaJsx(params)
+  return exportGroupsViaJsx(resolved)
 }
 
 // 无害测试:返回 PS 版本

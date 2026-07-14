@@ -79,9 +79,12 @@ describe('Agent 对话可调用脚本', () => {
       emit: (e) => events.push(e)
     })
 
-    const res = await handlers.exportGroups({ names: ['组84'] })
+    const res = await handlers.exportGroups({
+      targets: [{ psId: 84, path: '根组/组84', id: '0/0', name: '组84' }]
+    })
     expect(res.isError).toBeFalsy()
-    expect(fake.lastScript).toContain('组84')
+    // 文件名基名为 “叶子名_节点id”(psId=84)
+    expect(fake.lastScript).toContain('组84_84')
     expect(fake.lastScript).toContain('convertToSmartObject')
     expect(events.some((e) => e.type === 'tool_result' && e.name === 'export_groups')).toBe(true)
   })
@@ -128,7 +131,9 @@ describe('Agent 对话可调用脚本', () => {
       emit: () => {}
     })
 
-    const res = await handlers.exportGroups({ names: ['组84'] })
+    const res = await handlers.exportGroups({
+      targets: [{ psId: 84, path: '根组/组84', id: '0/0', name: '组84' }]
+    })
     // 全失败 → isError = true
     expect(res.isError).toBe(true)
     // 日志应被注入到返回数据中
@@ -163,7 +168,13 @@ describe('Agent 对话可调用脚本', () => {
       emit: () => {}
     })
 
-    const res = await handlers.exportGroups({ names: ['ok组', 'bad组1', 'bad组2'] })
+    const res = await handlers.exportGroups({
+      targets: [
+        { psId: 1, path: 'ok组', id: '0', name: 'ok组' },
+        { psId: 2, path: 'bad组1', id: '1', name: 'bad组1' },
+        { psId: 3, path: 'bad组2', id: '2', name: 'bad组2' }
+      ]
+    })
     // 部分失败 → 仍有 error 标记
     expect(res.isError).toBe(true)
     const data = JSON.parse(res.content[0].text)

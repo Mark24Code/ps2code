@@ -3,6 +3,7 @@ import type { PsdLayerNode } from '../../../shared/types'
 // ag-psd 的 Layer 结构里我们关心的字段(避免直接依赖 ag-psd 类型,便于单测传入普通对象)
 export interface RawLayer {
   name?: string
+  id?: number // ag-psd 的 layer id(PSD 原生 lyid)
   hidden?: boolean
   left?: number
   top?: number
@@ -17,19 +18,29 @@ export interface NormalizeResult {
   layerCount: number
 }
 
-function toNode(layer: RawLayer, id: string, counters: { groups: number; layers: number }): PsdLayerNode {
+function toNode(
+  layer: RawLayer,
+  id: string,
+  parentPath: string,
+  counters: { groups: number; layers: number }
+): PsdLayerNode {
   const left = layer.left ?? 0
   const top = layer.top ?? 0
   const right = layer.right ?? 0
   const bottom = layer.bottom ?? 0
   const isGroup = Array.isArray(layer.children)
+  const name = layer.name ?? '(未命名)'
+  const path = parentPath ? `${parentPath}/${name}` : name
 
   counters.layers++
   if (isGroup) counters.groups++
 
   const node: PsdLayerNode = {
     id,
-    name: layer.name ?? '(未命名)',
+    // ag-psd 缺失或为 0 时视为无原生 id(0 不是合法 lyid)
+    psId: typeof layer.id === 'number' && layer.id > 0 ? layer.id : undefined,
+    path,
+    name,
     kind: isGroup ? 'group' : 'layer',
     hidden: layer.hidden === true,
     bounds: { left, top, right, bottom },
@@ -43,7 +54,7 @@ function toNode(layer: RawLayer, id: string, counters: { groups: number; layers:
     node.children = layer.children
       .slice()
       .reverse()
-      .map((c, i) => toNode(c, `${id}/${i}`, counters))
+      .map((c, i) => toNode(c, `${id}/${i}`, path, counters))
   }
   return node
 }
@@ -55,6 +66,6 @@ export function normalizeTree(children: RawLayer[] | undefined): NormalizeResult
   const tree = (children ?? [])
     .slice()
     .reverse()
-    .map((c, i) => toNode(c, `${i}`, counters))
+    .map((c, i) => toNode(c, `${i}`, '', counters))
   return { tree, groupCount: counters.groups, layerCount: counters.layers }
 }

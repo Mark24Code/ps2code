@@ -60,10 +60,28 @@ function buildTools(handlers: ReturnType<typeof createToolHandlers>): ToolDefini
 
   return [
     defineTool({
+      name: 'search_layers',
+      label: '搜索图层',
+      description:
+        '按用户意图搜索图层。把自然语言意图转成标准匹配:mode=fuzzy 子串模糊(默认)、mode=regex 正则;parent 先定位父节点再只在其子树内搜索。返回命中列表,每条含 path(图层名链路径)、psId(PSD 原生 id,导出定位用)、id、name、kind、hidden、bounds。导出前必须先用本工具定位并收集 psId。',
+      parameters: Type.Object({
+        query: Type.String({ description: '匹配关键字(fuzzy 为子串;regex 为正则表达式)' }),
+        mode: Type.Optional(
+          Type.Union([Type.Literal('fuzzy'), Type.Literal('regex')], {
+            description: '匹配方式:fuzzy(子串,默认)或 regex(正则)'
+          })
+        ),
+        parent: Type.Optional(
+          Type.String({ description: '可选父节点名:先匹配该父节点,再只在其子树内搜索' })
+        )
+      }),
+      execute: async (_id, params) => wrap(await handlers.searchLayers(params))
+    }),
+    defineTool({
       name: 'list_layers',
       label: '列出图层',
       description:
-        '读取并返回当前设计稿的完整图层组层级树(含 id/name/kind/hidden/children)。可用正则过滤组名(不传则返回全部)。',
+        '读取并返回当前设计稿的完整图层层级树(含 id/psId/path/name/kind/hidden/children)。用于通览结构;精确定位请优先用 search_layers。',
       parameters: Type.Object({
         pattern: Type.Optional(
           Type.String({ description: '可选,用于过滤组名的正则表达式,不传则返回完整树' })
@@ -105,17 +123,27 @@ function buildTools(handlers: ReturnType<typeof createToolHandlers>): ToolDefini
     }),
     defineTool({
       name: 'export_groups',
-      label: '导出图层组',
+      label: '导出图层',
       description:
-        '导出匹配的图层组为 PNG 到本对话临时目录用于预览。倍率与裁剪默认取对话设置。支持 parent 参数限定在指定父组下搜索。',
+        '导出图层为 PNG 到本对话临时目录用于预览。倍率与裁剪默认取对话设置。' +
+        '优先传 targets(来自 search_layers 的命中,含 psId 用于精确定位、path/id/name 用于命名);' +
+        '文件名规则为 “末端叶子图层名_节点id”。也兼容旧的 pattern/names/parent(会在内部转为 targets)。',
       parameters: Type.Object({
-        pattern: Type.Optional(Type.String({ description: '匹配组名的正则' })),
-        names: Type.Optional(Type.Array(Type.String(), { description: '明确的组名列表' })),
+        targets: Type.Optional(
+          Type.Array(
+            Type.Object({
+              psId: Type.Optional(Type.Number({ description: 'PSD 原生图层 id(定位用)' })),
+              path: Type.String({ description: '图层名链路径,如 根组/x默认/1' }),
+              id: Type.String({ description: '路径式 id,如 0/2/1(psId 缺失时的回退)' }),
+              name: Type.String({ description: '末端叶子图层/组名(命名用)' })
+            }),
+            { description: 'search_layers 命中的导出目标列表(推荐)' }
+          )
+        ),
+        pattern: Type.Optional(Type.String({ description: '(兼容)匹配组名的正则' })),
+        names: Type.Optional(Type.Array(Type.String(), { description: '(兼容)明确的组名列表' })),
         parent: Type.Optional(
-          Type.String({
-            description:
-              '限定搜索范围:只在指定父组名下的子组中查找(不同父组下有同名子组时用于区分)'
-          })
+          Type.String({ description: '(兼容)限定父组范围' })
         )
       }),
       execute: async (_id, params) => wrap(await handlers.exportGroups(params))
@@ -179,18 +207,22 @@ export async function runAgent(
   const toolNames = customTools.map((t) => t.name)
 
   const systemPrompt = `你是 PS2Code 的设计稿助手。用户已锁定设计稿: ${targetPath}。
-你的职责是理解用户意图,并调用本地工具完成图层的查询/重命名/增删改/图层导出图片。
-不要臆造图层名;不确定时先用 list_layers 查看完整层级树。
-图层名字可能会出现重复(例如"x默认"和"已签"下都有1~7)，可以用 export_groups 的 parent 参数指定父组来区分范围。
+你的职责是理解用户意图,并调用本地工具完成图层的查询/搜索/重命名/增删改/导出图片。
+不要臆造图层名;不确定时先用 list_layers 通览结构,或用 search_layers 精确定位。
+
+【搜索:先把用户意图转成标准匹配】
+当用户提出搜索/定位需求时,你要理解意图并转换成 search_layers 的标准参数再计算:
+- 模糊搜索(mode=fuzzy,默认):按子串、大小写不敏感。适合"包含""大概叫""带 xx 字样"等模糊描述。
+- 正则搜索(mode=regex):把意图翻译成正则,如"1到7的图层"→ query="^[1-7]$"、"以 btn 开头"→ query="^btn"。
+- 父范围(parent):当同名图层出现在不同父组下(例如"x默认"和"已签"下都有 1~7),用 parent 先定位父节点,再只在其子树内搜索。
+search_layers 会返回每个命中的 path(图层名链路径)与 psId(PSD 原生 id)。你必须把这些命中收集起来用于后续导出。
 
 【导出前确认流程】
-导出图片前，必须先用 list_layers 搜索定位目标图层，把完整路径、bounds坐标、尺寸整理后，向用户列出即将导出的图层清单并请求确认。用户确认后才能调用 export_groups 执行导出。
+导出前,必须先用 search_layers 定位目标,把每个目标的 path、psId、bounds/尺寸整理后,向用户列出即将导出的清单并请求确认。用户确认后,把命中项作为 export_groups 的 targets 传入执行导出(targets 里带上 psId/path/id/name)。
 
 【导出文件命名规则】
-导出的文件名以图层树中最末位(叶子)图层/组的名字为准。如果导出了多个同名的组，文件会自动添加 _01,_02 等后缀。
-
-【防覆盖】
-每次导出前，先检查输出目录中是否已存在同名 .png(或 @2x.png) 文件。如果已有，自动跳过已存在的序号，分配下一个可用序号，确保绝不覆盖已有文件。
+导出文件名固定为 “末端叶子图层名_节点id”(节点id 优先用 PSD 原生 psId,缺失时回退路径式 id)。
+注意文件名中不能出现路径分隔符 “/”,遇到会自动替换为 “_”(如 A/B/C → A_B_C)。同名文件系统会自动追加 _01/_02 序号避免覆盖。
 
 破坏性操作(删除)会由系统弹出确认。
 当前设计稿信息:\n${layerSummary}`
