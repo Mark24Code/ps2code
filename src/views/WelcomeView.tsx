@@ -17,7 +17,7 @@ export function WelcomeView({ onNewChat, onDropPsd }: Props): JSX.Element {
         <Upload.Dragger
           multiple={false}
           showUploadList={false}
-          accept=".psd"
+          accept=".psd,.psb"
           openFileDialogOnClick={false}
           beforeUpload={(file) => {
             onDropPsd(window.api.getPathForFile(file as unknown as File))
@@ -28,7 +28,7 @@ export function WelcomeView({ onNewChat, onDropPsd }: Props): JSX.Element {
           <p className="ant-upload-drag-icon" style={{ color: 'var(--brand)' }}>
             <PlusOutlined style={{ fontSize: 40 }} />
           </p>
-          <p className="ant-upload-text">拖拽 PSD 到此,或点击选择文件</p>
+          <p className="ant-upload-text">拖拽 PSD / PSB 到此,或点击选择文件</p>
           <p className="ant-upload-hint">相同文件会自动打开已有项目</p>
         </Upload.Dragger>
       </div>

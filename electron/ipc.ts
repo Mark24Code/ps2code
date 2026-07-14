@@ -47,7 +47,7 @@ export function registerIpc(): void {
 
   // ---------- 项目 ----------
   ipcMain.handle(IPC.projectImport, (_e, psdPath: string) => {
-    const name = basename(psdPath).replace(/\.psd$/i, '')
+    const name = basename(psdPath).replace(/\.(psd|psb)$/i, '')
     return db.importProject(psdPath, name)
   })
   ipcMain.handle(IPC.projectList, () => db.listProjects())
@@ -280,7 +280,7 @@ export function registerIpc(): void {
     const win = getMainWindow()
     const res = await dialog.showOpenDialog(win!, {
       properties: ['openFile'],
-      filters: [{ name: 'PSD', extensions: ['psd'] }]
+      filters: [{ name: 'Photoshop', extensions: ['psd', 'psb'] }]
     })
     return res.canceled || !res.filePaths.length ? null : res.filePaths[0]
   })

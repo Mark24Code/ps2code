@@ -79,8 +79,8 @@ export function AppShell(): JSX.Element {
 
   // 导入 PSD → 建项目 → 建对话 → 打开
   const importAndStart = async (psdPath: string): Promise<void> => {
-    if (!psdPath.toLowerCase().endsWith('.psd')) {
-      message.error('只支持 .psd 文件')
+    if (!/\.(psd|psb)$/i.test(psdPath)) {
+      message.error('只支持 .psd / .psb 文件')
       return
     }
     const project = await window.api.projectImport(psdPath)
