@@ -21,6 +21,7 @@
 
         // 解析每个 target 为实际图层对象 + 导出基名(exportName 已由 Node 预计算为 叶子名_节点id)。
         var matched = []; // { layer, exportName }
+        err = 0;          // 未匹配到的目标数 + 导出异常数
         for (var ti = 0; ti < targets.length; ti++) {
             var t = targets[ti];
             var layer = null;
@@ -31,6 +32,7 @@
             if (!layer) layer = PS2.findAnyByName(doc, t.name);
             if (!layer) {
                 PS2._push("✕ 未找到目标: " + t.name + " (id=" + t.psId + ")");
+                err++;
                 continue;
             }
             matched.push({ layer: layer, exportName: t.exportName });

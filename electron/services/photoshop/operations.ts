@@ -274,7 +274,39 @@ async function exportGroupsViaShell(
 async function exportGroupsViaJsx(
   params: ExportParams
 ): Promise<JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>> {
-  return runScript('export-groups.jsx', params)
+  const res = await runScript<{
+    files: string[]
+    meta?: { file: string; group: string; w: number; h: number; x: number; y: number }[]
+    matched: number; ok: number; err: number; outputDir: string
+  }>('export-groups.jsx', params)
+
+  // 写 _meta.json(与 exportGroupsViaShell 一致),按 exportName 把 psId/path/id 附回
+  if (res.ok && res.data.files && res.data.files.length > 0) {
+    try {
+      const { writeFile, mkdir } = await import('fs/promises')
+      const { dirname } = await import('path')
+      const outDir = dirname(res.data.files[0])
+      await mkdir(outDir, { recursive: true })
+      const rebased = res.data.files.map((f, i) => {
+        const m = res.data.meta?.[i]
+        if (!m) return null
+        const segs = f.split(/[/\\]/)
+        const file = segs[segs.length - 1]
+        const t = matchTargetByFile(file, params.targets)
+        return {
+          file,
+          group: m.group,
+          w: m.w, h: m.h, x: m.x, y: m.y,
+          psId: t?.psId,
+          path: t?.path,
+          layerId: t?.id
+        }
+      }).filter(Boolean)
+      await writeFile(outDir + '/_meta.json', JSON.stringify(rebased), 'utf8')
+    } catch { /* meta 写入失败不影响导出结果 */ }
+  }
+
+  return res
 }
 
 // 对外入口:接收 agentTools 收集的 targets(含 path/id/psId),
