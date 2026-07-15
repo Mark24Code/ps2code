@@ -1,6 +1,6 @@
 import { app, dialog, ipcMain, shell } from 'electron'
 import { basename, dirname, extname, join } from 'path'
-import { copyFile, mkdir, readdir, readFile, stat } from 'fs/promises'
+import { copyFile, mkdir, readdir, readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { unlink, writeFile } from 'fs/promises'
 import { IPC } from '../shared/ipc'
@@ -215,45 +215,46 @@ export function registerIpc(): void {
     return { ok: true, dir: dest, count: filtered.length }
   })
 
-  // ---------- 预览: 列出对话 tmp 下的 PNG,返回 dataURL + 元数据,按 mtime 倒序 ----------
+  // ---------- 预览: 列出对话 tmp 下的 PNG,按导出顺序排列(新→旧) ----------
   ipcMain.handle(IPC.previewList, async (_e, conversationId: string) => {
     const conv = db.getConversation(conversationId)
     if (!conv || !existsSync(conv.tmpDir)) return []
     const files = (await readdir(conv.tmpDir)).filter((f) => f.toLowerCase().endsWith('.png'))
 
-    // 按文件修改时间倒序排列
-    const withMtime = await Promise.all(
-      files.map(async (f) => {
-        try {
-          const st = await stat(join(conv.tmpDir, f))
-          return { file: f, mtime: st.mtimeMs }
-        } catch {
-          return { file: f, mtime: 0 }
-        }
-      })
-    )
-    withMtime.sort((a, b) => b.mtime - a.mtime)
-
-    // 读取导出元数据(尺寸/坐标)
+    // 读取导出元数据(尺寸/坐标),其数组顺序即导出顺序(后导出=新)
+    let metaOrder: string[] = []
     let metaMap: Record<string, { w: number; h: number; x: number; y: number }> = {}
     const metaPath = join(conv.tmpDir, '_meta.json')
     if (existsSync(metaPath)) {
       try {
         const metaRaw = await readFile(metaPath, 'utf8')
         const metaArr = JSON.parse(metaRaw) as { file: string; w: number; h: number; x: number; y: number }[]
+        metaOrder = metaArr.map((m) => m.file)
         for (const m of metaArr) metaMap[m.file] = { w: m.w, h: m.h, x: m.x, y: m.y }
       } catch { /* ignore parse errors */ }
     }
 
-    const out: { name: string; dataUrl: string; w?: number; h?: number; x?: number; y?: number; mtime: number }[] = []
-    for (const { file: f, mtime } of withMtime) {
+    // 排序:有 metaOrder 则按导出顺序(后导出→前),否则按 readdir 顺序取反
+    let sortedFiles: string[]
+    if (metaOrder.length > 0) {
+      // 只取 metaOrder 中存在的文件;不在其中的追加到末尾
+      const inMeta = metaOrder.filter((f) => files.includes(f))
+      const notInMeta = files.filter((f) => !metaOrder.includes(f)).reverse()
+      sortedFiles = [...inMeta.reverse(), ...notInMeta]
+    } else {
+      sortedFiles = [...files].reverse()
+    }
+
+    const out: { name: string; dataUrl: string; w?: number; h?: number; x?: number; y?: number; seq: number }[] = []
+    for (let idx = 0; idx < sortedFiles.length; idx++) {
+      const f = sortedFiles[idx]
       const buf = await readFile(join(conv.tmpDir, f))
       const meta = metaMap[f]
       out.push({
         name: f,
         dataUrl: `data:image/png;base64,${buf.toString('base64')}`,
         ...(meta || {}),
-        mtime
+        seq: sortedFiles.length - idx // seq 越大越新
       })
     }
     return out

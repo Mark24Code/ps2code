@@ -16,7 +16,7 @@ interface PreviewItem {
   h?: number
   x?: number
   y?: number
-  mtime: number
+  seq: number
 }
 
 type ViewMode = 'grid' | 'list'
@@ -127,7 +127,7 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
-  const [sortAsc, setSortAsc] = useState(false) // 默认从新到旧(desc = false)
+  const [sortAsc, setSortAsc] = useState(false) // false=从新到旧(desc,默认), true=从旧到新(asc)
 
   useEffect(() => {
     window.api.previewList(conversation.id).then((list) => {
@@ -136,14 +136,14 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
     })
   }, [conversation.id, nonce])
 
-  // 过滤 + 按 mtime 排序
+  // 过滤 + 按导出顺序(seq)排序
   const filtered = useMemo(() => {
     let list = items
     if (filter.trim()) {
       const kw = filter.trim().toLowerCase()
       list = list.filter((it) => it.name.toLowerCase().includes(kw))
     }
-    return [...list].sort((a, b) => sortAsc ? a.mtime - b.mtime : b.mtime - a.mtime)
+    return [...list].sort((a, b) => sortAsc ? a.seq - b.seq : b.seq - a.seq)
   }, [items, filter, sortAsc])
 
   const { x2, x1 } = useMemo(() => {
