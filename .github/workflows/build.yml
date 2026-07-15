@@ -19,7 +19,9 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci --ignore-scripts
+          npx electron-rebuild -f -w better-sqlite3
 
       - name: Build & package (macOS ARM64)
         run: npm run dist:mac
@@ -44,7 +46,9 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci --ignore-scripts
+          npx electron-rebuild -f -w better-sqlite3
 
       - name: Build & package (Windows x64)
         run: npm run dist:win
@@ -55,3 +59,39 @@ jobs:
           name: PS2Code-win-x64
           path: dist/PS2Code-*-x64.exe
           if-no-files-found: error
+
+  # 汇总:列出所有构建产物
+  summarize:
+    needs: [build-mac-arm64, build-win-x64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: List artifacts in summary
+        shell: bash
+        run: |
+          echo "## ✅ 构建完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 下载产物" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 平台 | 文件 | 大小 |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|------|" >> $GITHUB_STEP_SUMMARY
+          for dir in PS2Code-*/; do
+            if [ -d "$dir" ]; then
+              file=$(ls "$dir" 2>/dev/null | head -1)
+              if [ -n "$file" ]; then
+                size=$(du -h "$dir/$file" 2>/dev/null | cut -f1)
+                echo "| $dir | $file | $size |" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> 产物可从 Actions 页面 Artifacts 区域下载" >> $GITHUB_STEP_SUMMARY
+          echo ""
+          echo "=== 构建产物清单 ==="
+          for dir in PS2Code-*/; do
+            if [ -d "$dir" ]; then
+              ls -lh "$dir"
+            fi
+          done
