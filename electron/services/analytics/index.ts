@@ -216,13 +216,23 @@ export function sendEvent(
       events: [{ name, params: cleanParams }],
     }
 
+    const isDev = !app.isPackaged || process.env.DEBUG_ANALYTICS
+    if (isDev) console.log(`[analytics] → ${name}`, cleanParams)
+
     fetch(url, {
       method: 'POST',
       body: JSON.stringify(payload),
       headers: { 'Content-Type': 'application/json' },
-    }).catch(() => {
-      /* 网络失败静默忽略 */
     })
+      .then(async (res) => {
+        if (!res.ok && isDev) {
+          const body = await res.text().catch(() => '(no body)')
+          console.warn(`[analytics] ✕ ${name} HTTP ${res.status}: ${body}`)
+        }
+      })
+      .catch((err) => {
+        if (isDev) console.warn(`[analytics] ✕ ${name} 请求失败:`, err?.message ?? err)
+      })
   } catch {
     /* 任何异常都不应影响主应用 */
   }
