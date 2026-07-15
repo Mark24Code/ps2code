@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { App, Button, Checkbox, Divider, Empty, Input, Modal, Progress, Tooltip, Typography } from 'antd'
-import { AppstoreOutlined, DeleteOutlined, ExportOutlined, FolderOpenOutlined, SortAscendingOutlined, UnorderedListOutlined } from '@ant-design/icons'
-import type { Conversation } from '@shared/types'
+import { AppstoreOutlined, DeleteOutlined, ExportOutlined, FolderOpenOutlined, FolderOutlined, SortAscendingOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import type { ArchiveFolder, Conversation } from '@shared/types'
 
 interface Props {
   conversation: Conversation
   nonce: number
   exporting?: boolean
+  onCountChange?: (count: number) => void
 }
 
 interface PreviewItem {
@@ -119,7 +120,7 @@ function ListThumbs({
   )
 }
 
-export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Element {
+export function PreviewPane({ conversation, nonce, exporting, onCountChange }: Props): JSX.Element {
   const { message } = App.useApp()
   const [items, setItems] = useState<PreviewItem[]>([])
   const [confirming, setConfirming] = useState(false)
@@ -128,12 +129,22 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [sortAsc, setSortAsc] = useState(false) // false=从新到旧(desc,默认), true=从旧到新(asc)
+  const [archiveFolders, setArchiveFolders] = useState<ArchiveFolder[]>([])
+  const [archivesExpanded, setArchivesExpanded] = useState(false)
 
   useEffect(() => {
     window.api.previewList(conversation.id).then((list) => {
       setItems(list)
       setSelected(new Set()) // 刷新后重置选择
+      onCountChange?.(list.length)
     })
+  }, [conversation.id, nonce, onCountChange])
+
+  // 加载归档文件夹列表
+  useEffect(() => {
+    window.api.previewArchiveList(conversation.id).then((folders) => {
+      setArchiveFolders(folders)
+    }).catch(() => { /* 归档目录可能还不存在 */ })
   }, [conversation.id, nonce])
 
   // 过滤 + 按导出顺序(seq)排序
@@ -361,6 +372,69 @@ export function PreviewPane({ conversation, nonce, exporting }: Props): JSX.Elem
               </>
             )}
           </>
+        )}
+
+        {/* ---- 归档文件夹 ---- */}
+        {archiveFolders.length > 0 && (
+          <div style={{ padding: '0 12px 12px' }}>
+            <Divider
+              plain
+              style={{ margin: '8px 0', fontSize: 12 }}
+            >
+              <span
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => setArchivesExpanded(!archivesExpanded)}
+              >
+                <FolderOutlined style={{ marginRight: 4 }} />
+                归档备份 ({archiveFolders.length})
+                <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--text-3)' }}>
+                  {archivesExpanded ? '点击收起' : '点击展开'}
+                </span>
+              </span>
+            </Divider>
+            {archivesExpanded && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {archiveFolders.map((folder) => (
+                  <div
+                    key={folder.name}
+                    className="archive-folder-item"
+                    onClick={() => window.api.openPath(folder.path)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '8px 12px',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      transition: 'background .15s, border-color .15s'
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = '#f5f5f5'
+                      ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--brand)'
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = 'transparent'
+                      ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
+                    }}
+                  >
+                    <FolderOpenOutlined style={{ fontSize: 20, color: '#faad14' }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <Typography.Text
+                        ellipsis={{ tooltip: folder.name }}
+                        style={{ display: 'block', fontSize: 12, fontWeight: 500 }}
+                      >
+                        {folder.name}
+                      </Typography.Text>
+                      <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                        {folder.fileCount} 个文件
+                      </Typography.Text>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

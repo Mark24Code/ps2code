@@ -2,10 +2,13 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '../shared/ipc'
 import type {
   AppSettings,
+  ArchiveFolder,
   Conversation,
   Message,
   Project,
   PsdMeta,
+  RecutProgress,
+  RecutResult,
   VersionDiffResult,
   VersionSnapshot
 } from '../shared/types'
@@ -136,6 +139,21 @@ const api = {
     ipcRenderer.invoke(IPC.versionsList, projectId),
   versionsDiff: (projectId: number, baseVersion: number): Promise<VersionDiffResult> =>
     ipcRenderer.invoke(IPC.versionsDiff, projectId, baseVersion),
+
+  // 归档
+  previewArchiveList: (conversationId: string): Promise<ArchiveFolder[]> =>
+    ipcRenderer.invoke(IPC.previewArchiveList, conversationId),
+  previewArchiveCreate: (conversationId: string): Promise<{ path: string }> =>
+    ipcRenderer.invoke(IPC.previewArchiveCreate, conversationId),
+
+  // 重切
+  previewRecut: (conversationId: string): Promise<RecutResult> =>
+    ipcRenderer.invoke(IPC.previewRecut, conversationId),
+  onRecutProgress: (cb: (event: { conversationId: string; progress: RecutProgress }) => void): (() => void) => {
+    const listener = (_e: unknown, data: { conversationId: string; progress: RecutProgress }): void => cb(data)
+    ipcRenderer.on(IPC.recutStream, listener)
+    return () => ipcRenderer.removeListener(IPC.recutStream, listener)
+  },
 }
 
 contextBridge.exposeInMainWorld('api', api)

@@ -1002,3 +1002,34 @@ body {
 .diff-ruler-line:hover {
   opacity: 0.6;
 }
+
+/* ---------- 自动重切按钮 ---------- */
+.recut-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color .15s, transform .15s;
+}
+.recut-btn:hover {
+  color: var(--brand) !important;
+  transform: rotate(-10deg);
+}
+
+/* ---------- 归档文件夹卡片 ---------- */
+.archive-folder-item:hover {
+  background: #f5f5f5;
+  border-color: var(--brand) !important;
+}
+
+/* ---------- 重切 Modal 步骤容器 ---------- */
+.recut-modal-step {
+  padding: 16px 0;
+}
+
+/* ---------- 重切结果表格 ---------- */
+.recut-table-success .ant-table-row:hover td {
+  background: #f6ffed !important;
+}
+.recut-table-fail .ant-table-row:hover td {
+  background: #fff2f0 !important;
+}

@@ -1,11 +1,11 @@
 import { app, dialog, ipcMain, shell } from 'electron'
 import { basename, dirname, extname, join } from 'path'
-import { copyFile, mkdir, readdir, readFile } from 'fs/promises'
+import { copyFile, mkdir, readdir, readFile, rm } from 'fs/promises'
 import { existsSync } from 'fs'
 import { unlink, writeFile } from 'fs/promises'
 import { IPC } from '../shared/ipc'
 import { dedupeFileName } from '../shared/naming'
-import type { AgentStreamEvent, AppSettings, Conversation } from '../shared/types'
+import type { AgentStreamEvent, AppSettings, ArchiveFolder, Conversation, RecutResult } from '../shared/types'
 import * as db from './services/db'
 import { readPsdMeta } from './services/psd'
 import { buildLayerCache, getLayerMeta } from './services/psd/layerCache'
@@ -13,6 +13,8 @@ import { buildLayoutManifest, type ExportMetaEntry } from './services/psd/layout
 import * as versionService from './services/version'
 import { getBridge } from './services/photoshop'
 import { ensureDesignReady, testConnection } from './services/photoshop/operations'
+import { exportGroups } from './services/photoshop/operations'
+import type { RawExportTarget } from './services/photoshop/operations'
 import { cancelAgent, checkAgentConfig, resolveConfirm, runAgent } from './services/agent'
 import { getLogs, logPath } from './services/agent/logStore'
 import { checkUpdate } from './services/updater'
@@ -319,4 +321,179 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.versionsDiff, (_e, projectId: number, baseVersion: number) =>
     versionService.getDiff(projectId, baseVersion)
   )
+
+  // ---------- 归档 ----------
+  /** 归档目录: ~/.ps2code/archives/<convId>/ */
+  function archivesDir(conversationId: string): string {
+    return join(app.getPath('home'), '.ps2code', 'archives', String(conversationId))
+  }
+
+  /** 创建归档(共享逻辑,供 IPC handler 和 recut handler 复用) */
+  async function createArchive(conversationId: string): Promise<string> {
+    const conv = db.getConversation(conversationId)
+    if (!conv) throw new Error('对话不存在')
+    if (!existsSync(conv.tmpDir)) throw new Error('没有可归档的导出文件')
+
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`
+    const archiveName = `自动重切备份:${ts}`
+    const archiveDir = join(archivesDir(conversationId), archiveName)
+    await mkdir(archiveDir, { recursive: true })
+
+    const files = await readdir(conv.tmpDir)
+    let copied = 0
+    for (const f of files) {
+      const src = join(conv.tmpDir, f)
+      if (!existsSync(src)) continue
+      try {
+        await copyFile(src, join(archiveDir, f))
+        copied++
+      } catch { /* 跳过无法复制的文件 */ }
+    }
+    if (copied === 0) throw new Error('归档失败:无法复制任何文件')
+    return archiveDir
+  }
+
+  // 列出所有归档文件夹
+  ipcMain.handle(IPC.previewArchiveList, async (_e, conversationId: string): Promise<ArchiveFolder[]> => {
+    const dir = archivesDir(conversationId)
+    if (!existsSync(dir)) return []
+    const entries = await readdir(dir, { withFileTypes: true })
+    const folders: ArchiveFolder[] = []
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      const folderPath = join(dir, entry.name)
+      const files = await readdir(folderPath)
+      const pngCount = files.filter((f) => f.toLowerCase().endsWith('.png')).length
+      folders.push({
+        name: entry.name,
+        path: folderPath,
+        fileCount: pngCount,
+        createdAt: entry.name.replace(/^自动重切备份:/, '')
+      })
+    }
+    return folders.sort((a, b) => b.name.localeCompare(a.name))
+  })
+
+  // 创建归档
+  ipcMain.handle(IPC.previewArchiveCreate, async (_e, conversationId: string): Promise<{ path: string }> => {
+    const path = await createArchive(conversationId)
+    return { path }
+  })
+
+  // ---------- 重切 ----------
+  function emitRecutProgress(conversationId: string, progress: import('../shared/types').RecutProgress): void {
+    getMainWindow()?.webContents.send(IPC.recutStream, { conversationId, progress })
+  }
+
+  // 基于已有 _meta.json 重新切图
+  ipcMain.handle(IPC.previewRecut, async (_e, conversationId: string): Promise<RecutResult> => {
+    const conv = db.getConversation(conversationId)
+    if (!conv) throw new Error('对话不存在')
+    const project = db.getProject(conv.projectId)
+    if (!project) throw new Error('项目不存在')
+
+    const metaPath = join(conv.tmpDir, '_meta.json')
+    if (!existsSync(metaPath)) {
+      throw new Error('找不到导出元数据(_meta.json)，请先让 Agent 导出图片后再试')
+    }
+
+    // 1. 读取 _meta.json 恢复导出目标
+    emitRecutProgress(conversationId, { step: 'archive', message: '正在读取导出配置...' })
+    const rawMeta = await readFile(metaPath, 'utf8')
+    const metaEntries: ExportMetaEntry[] = JSON.parse(rawMeta)
+    if (metaEntries.length === 0) {
+      throw new Error('导出配置为空，没有可重切的图片')
+    }
+
+    const targets: RawExportTarget[] = metaEntries.map((m) => ({
+      psId: m.psId,
+      path: m.path || '',
+      id: m.layerId || m.group,
+      name: m.group
+    }))
+
+    // 2. 归档
+    emitRecutProgress(conversationId, { step: 'archive', message: '正在归档当前导出...' })
+    let archivePath = ''
+    try {
+      archivePath = await createArchive(conversationId)
+    } catch (e) {
+      throw new Error(`归档失败: ${(e as Error).message}`)
+    }
+
+    // 清空 tmpDir
+    emitRecutProgress(conversationId, { step: 'recut', message: '准备重新导出...' })
+    try {
+      const oldFiles = await readdir(conv.tmpDir)
+      for (const f of oldFiles) {
+        try { await rm(join(conv.tmpDir, f), { force: true }) } catch { /* */ }
+      }
+    } catch { /* */ }
+
+    // 3. 调用 exportGroups
+    emitRecutProgress(conversationId, {
+      step: 'recut', message: '正在调用 Photoshop 重新切图...',
+      total: targets.length, current: 0
+    })
+
+    const successes: string[] = []
+    const failures: { name: string; reason: string }[] = []
+    const BATCH_SIZE = 10
+    for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+      const batch = targets.slice(i, i + BATCH_SIZE)
+      try {
+        const result = await exportGroups({
+          targetPath: project.psdPath,
+          targets: batch,
+          x1: conv.opt1x, x2: conv.opt2x,
+          trim: conv.optTrim, compress: conv.optCompress,
+          outputDir: conv.tmpDir
+        })
+
+        if (result.ok && result.data) {
+          for (const tf of result.data.files || []) successes.push(tf)
+        }
+        if (result.log) {
+          for (const line of result.log) {
+            if (line.includes('✕') || line.includes('未找到') || line.includes('未定位')) {
+              failures.push({ name: line, reason: line })
+            }
+          }
+        }
+        if (result.data.err > 0) {
+          const exportedCount = (result.data.files || []).length
+          const expectedCount = batch.length * (conv.opt1x && conv.opt2x ? 2 : conv.opt1x || conv.opt2x ? 1 : 2)
+          if (exportedCount < expectedCount) {
+            for (const t of batch) {
+              const hasFile = (result.data.files || []).some((f: string) =>
+                f.toLowerCase().includes(t.name.toLowerCase().replace(/[^a-z0-9一-鿿]/g, '_'))
+              )
+              if (!hasFile) failures.push({ name: t.name, reason: '图层可能已被修改或删除，未找到匹配项' })
+            }
+          }
+        }
+      } catch (e) {
+        for (const t of batch) failures.push({ name: t.name, reason: `导出异常: ${(e as Error).message}` })
+      }
+
+      emitRecutProgress(conversationId, {
+        step: 'recut',
+        message: `正在重切...(${Math.min(i + BATCH_SIZE, targets.length)}/${targets.length})`,
+        total: targets.length,
+        current: Math.min(i + BATCH_SIZE, targets.length),
+        failures: failures.length > 0 ? failures : undefined,
+        successes: successes.length > 0 ? successes : undefined
+      })
+    }
+
+    emitRecutProgress(conversationId, {
+      step: 'done',
+      message: `重切完成。成功: ${successes.length} 个, 失败: ${failures.length} 个`,
+      successes, failures
+    })
+
+    return { successes, failures, archivePath }
+  })
 }

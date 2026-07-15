@@ -8,7 +8,8 @@ import {
   FolderOpenOutlined,
   HistoryOutlined,
   PaperClipOutlined,
-  PauseCircleFilled
+  PauseCircleFilled,
+  ScissorOutlined
 } from '@ant-design/icons'
 import type { Conversation, VersionDiffResult, VersionSnapshot } from '@shared/types'
 
@@ -23,19 +24,21 @@ interface Props {
   latestVersion?: VersionSnapshot | null
   diffBaseVersion?: number | null
   diffData?: VersionDiffResult | null
+  previewCount?: number
   onOpenTimeline?: () => void
   onExitDiffMode?: () => void
   onSend: (text: string) => void
   onStop: () => void
   onUpdate: (c: Conversation) => void
+  onRecut?: () => void
 }
 
 // 对话框上方:设计稿别针标识 + PS 就绪状态。
 // 下方:导出设置(分行展示,不挤一排)。最后是输入框。
 export function Composer(props: Props): JSX.Element {
   const { conversation, busy, disabled, designName, psdPath, readyState, readyMessage,
-    latestVersion, diffBaseVersion, diffData, onOpenTimeline, onExitDiffMode,
-    onSend, onStop, onUpdate } = props
+    latestVersion, diffBaseVersion, diffData, previewCount, onOpenTimeline, onExitDiffMode,
+    onSend, onStop, onUpdate, onRecut } = props
   const { message } = App.useApp()
   const [text, setText] = useState('')
 
@@ -141,6 +144,29 @@ export function Composer(props: Props): JSX.Element {
               onClick={() => onExitDiffMode?.()}
             />
           </div>
+        )}
+
+        <span style={{ flex: 1 }} />
+
+        {/* 自动重切按钮:有预览图片时显示 */}
+        {previewCount !== undefined && previewCount > 0 && onRecut && (
+          <Tooltip title="自动重切">
+            <Button
+              type="text"
+              size="small"
+              className="recut-btn"
+              icon={<ScissorOutlined />}
+              onClick={onRecut}
+              style={{
+                color: 'var(--text-2)',
+                fontSize: 16,
+                padding: '0 4px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            />
+          </Tooltip>
         )}
       </div>
 

@@ -17,6 +17,7 @@ import type {
 import { Composer } from '../components/Composer'
 import { PreviewPane } from '../components/PreviewPane'
 import { LayerTree } from '../components/LayerTree'
+import { RecutModal } from '../components/RecutModal'
 import { VersionTimeline } from '../components/VersionTimeline'
 import { MessageBubble } from '../components/MessageBubble'
 import { ThinkingBubble } from '../components/ThinkingBubble'
@@ -47,6 +48,10 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
   const [logs, setLogs] = useState<{ ts: number; level: string; message: string }[]>([])
   const [rightTab, setRightTab] = useState<'preview' | 'layers' | 'diff'>('preview')
   const msgEndRef = useRef<HTMLDivElement>(null)
+
+  // 重切
+  const [recutModalOpen, setRecutModalOpen] = useState(false)
+  const [previewCount, setPreviewCount] = useState(0)
 
   // 版本管理
   const [latestVersion, setLatestVersion] = useState<VersionSnapshot | null>(null)
@@ -506,6 +511,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
           latestVersion={latestVersion}
           diffBaseVersion={diffBaseVersion}
           diffData={diffData}
+          previewCount={previewCount}
           onOpenTimeline={() => setTimelineOpen(true)}
           onExitDiffMode={exitDiffMode}
           onSend={send}
@@ -515,6 +521,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
             appendMsg('tool', '⏹ 已停止')
           }}
           onUpdate={updateConv}
+          onRecut={() => setRecutModalOpen(true)}
         />
       </div>
 
@@ -573,7 +580,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
         {/* Tab 内容 */}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {rightTab === 'preview' && (
-            <PreviewPane conversation={conv} nonce={previewNonce} exporting={exporting} />
+            <PreviewPane conversation={conv} nonce={previewNonce} exporting={exporting} onCountChange={setPreviewCount} />
           )}
           {rightTab === 'layers' && (
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
@@ -597,6 +604,17 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
           onSelectVersion={(v) => enterDiffMode(v)}
         />
       )}
+
+      {/* 自动重切 Modal */}
+      <RecutModal
+        open={recutModalOpen}
+        conversationId={conversationId}
+        onClose={() => {
+          setRecutModalOpen(false)
+          // 重切后刷新预览
+          setPreviewNonce((n) => n + 1)
+        }}
+      />
     </div>
   )
 }

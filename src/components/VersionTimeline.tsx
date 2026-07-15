@@ -45,7 +45,7 @@ export function VersionTimeline({
       onCancel={onClose}
       footer={null}
       width={480}
-      destroyOnClose
+      destroyOnHidden
       styles={{ body: { maxHeight: '60vh', overflow: 'auto', padding: 0 } }}
     >
       {loading ? (

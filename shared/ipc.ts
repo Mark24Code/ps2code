@@ -75,6 +75,14 @@ export const IPC = {
   versionsCheck: 'versions:check',
   versionsList: 'versions:list',
   versionsDiff: 'versions:diff',
+
+  // 归档
+  previewArchiveList: 'archive:list',
+  previewArchiveCreate: 'archive:create',
+
+  // 重切
+  previewRecut: 'recut:run',
+  recutStream: 'recut:stream',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

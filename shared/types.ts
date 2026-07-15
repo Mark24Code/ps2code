@@ -111,6 +111,31 @@ export interface AppSettings {
   defaultExportDir: string
 }
 
+// 归档文件夹信息
+export interface ArchiveFolder {
+  name: string       // "自动重切备份:2026-07-15_14-30-00"
+  path: string       // 绝对路径
+  fileCount: number
+  createdAt: string
+}
+
+// 重切进度事件
+export interface RecutProgress {
+  step: 'archive' | 'recut' | 'done' | 'error'
+  message: string
+  total?: number
+  current?: number
+  failures?: { name: string; reason: string }[]
+  successes?: string[]
+}
+
+// 重切结果
+export interface RecutResult {
+  successes: string[]
+  failures: { name: string; reason: string }[]
+  archivePath: string
+}
+
 // 导出布局清单:描述每张导出图片的原始来源与位置/尺寸/层级,便于据此还原布局。
 export interface LayoutItem {
   file: string // 最终落地文件名(含 @2x)
