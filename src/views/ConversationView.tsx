@@ -55,6 +55,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
 
   // 版本管理
   const [latestVersion, setLatestVersion] = useState<VersionSnapshot | null>(null)
+  const [justUpgraded, setJustUpgraded] = useState(false)
   const [diffBaseVersion, setDiffBaseVersion] = useState<number | null>(null)
   const [diffData, setDiffData] = useState<VersionDiffResult | null>(null)
   const [diffLoading, setDiffLoading] = useState(false)
@@ -165,9 +166,14 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
         try {
           const r = await window.api.versionsCheck(project.id)
           setLatestVersion(r.snapshot)
-          // 若正处于 diff 模式,刷新 diff 数据(最新版变了)
-          if (diffBaseVersion !== null && r.created) {
-            loadDiff(project.id, diffBaseVersion)
+          // 版本有更新 → 展示升级箭头(10秒后自动消失)
+          if (r.created) {
+            setJustUpgraded(true)
+            setTimeout(() => setJustUpgraded(false), 10000)
+            // 若正处于 diff 模式,刷新 diff 数据(最新版变了)
+            if (diffBaseVersion !== null) {
+              loadDiff(project.id, diffBaseVersion)
+            }
           }
         } catch { /* 静默 */ }
       }, 800)
@@ -509,6 +515,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
           readyState={ready.state}
           readyMessage={ready.message}
           latestVersion={latestVersion}
+          justUpgraded={justUpgraded}
           diffBaseVersion={diffBaseVersion}
           diffData={diffData}
           previewCount={previewCount}

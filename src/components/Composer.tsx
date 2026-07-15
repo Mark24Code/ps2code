@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { App, Button, Checkbox, Input, Space, Spin, Tag, Tooltip, Typography } from 'antd'
 import {
+  ArrowUpOutlined,
   CheckCircleFilled,
   CloseCircleFilled,
   CloseOutlined,
   EditOutlined,
   FolderOpenOutlined,
+  ForwardOutlined,
   HistoryOutlined,
   PaperClipOutlined,
   PauseCircleFilled,
@@ -22,6 +24,7 @@ interface Props {
   readyState?: 'idle' | 'loading' | 'ok' | 'error'
   readyMessage?: string
   latestVersion?: VersionSnapshot | null
+  justUpgraded?: boolean
   diffBaseVersion?: number | null
   diffData?: VersionDiffResult | null
   previewCount?: number
@@ -37,7 +40,7 @@ interface Props {
 // 下方:导出设置(分行展示,不挤一排)。最后是输入框。
 export function Composer(props: Props): JSX.Element {
   const { conversation, busy, disabled, designName, psdPath, readyState, readyMessage,
-    latestVersion, diffBaseVersion, diffData, previewCount, onOpenTimeline, onExitDiffMode,
+    latestVersion, justUpgraded, diffBaseVersion, diffData, previewCount, onOpenTimeline, onExitDiffMode,
     onSend, onStop, onUpdate, onRecut } = props
   const { message } = App.useApp()
   const [text, setText] = useState('')
@@ -122,7 +125,12 @@ export function Composer(props: Props): JSX.Element {
               <span className="version-icon-wrap">
                 <HistoryOutlined />
                 {latestVersion && (
-                  <span className="version-badge">{latestVersion.label}</span>
+                  <span className="version-badge">{latestVersion.label}
+                  <span className="version-upgrade-arrow"><ForwardOutlined /></span>
+                  </span>
+                )}
+                {justUpgraded && (
+                  <span className="version-upgrade-arrow"><ArrowUpOutlined /></span>
                 )}
               </span>
             }

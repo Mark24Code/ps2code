@@ -1003,6 +1003,24 @@ body {
   opacity: 0.6;
 }
 
+/* ---------- 版本升级箭头(红色,循环向上 + 淡出) ---------- */
+
+.version-upgrade-arrow {
+  color: #f5222d;
+  position: absolute;
+  right: -13px;
+  top: -4px;
+  font-size: 14px;
+  animation: version-upgrade-loop 2s linear infinite;
+}
+@keyframes version-upgrade-loop {
+  0%   { transform: rotate(-90deg) translateX(-8px); opacity: 0; }
+  20%  { transform: rotate(-90deg) translateX(-4px); opacity: 1; }
+  50%  { transform: rotate(-90deg) translateX(0); opacity: 1; }
+  80%  { transform: rotate(-90deg) translateX(4px); opacity: 0.6; }
+  100% { transform: rotate(-90deg) translateX(8px); opacity: 0; }
+}
+
 /* ---------- 自动重切按钮 ---------- */
 .recut-btn {
   display: inline-flex;
