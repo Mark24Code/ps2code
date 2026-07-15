@@ -20,7 +20,7 @@ import { cancelAgent, checkAgentConfig, resolveConfirm, runAgent } from './servi
 import { getLogs, logPath } from './services/agent/logStore'
 import { checkUpdate } from './services/updater'
 import { getMainWindow } from './main'
-import { sendEvent, isAnalyticsEnabled, setApiSecret, disableAnalytics } from './services/analytics'
+import { sendEvent, isAnalyticsEnabled, setApiSecret, disableAnalytics, getFingerprint } from './services/analytics'
 import type { AnalyticsEventName } from '../shared/analytics'
 
 function convTmpDir(conversationId: string): string {
@@ -455,6 +455,7 @@ Write-Output 'OK'`
   ipcMain.handle(IPC.analyticsStatus, () => isAnalyticsEnabled())
   ipcMain.handle(IPC.analyticsSetSecret, (_e, secret: string) => { setApiSecret(secret); return true })
   ipcMain.handle(IPC.analyticsDisable, () => { disableAnalytics(); return true })
+  ipcMain.handle(IPC.analyticsGetFingerprint, () => getFingerprint())
 
   // 基于已有 _meta.json 重新切图
   ipcMain.handle(IPC.previewRecut, async (_e, conversationId: string): Promise<RecutResult> => {

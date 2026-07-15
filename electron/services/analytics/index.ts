@@ -254,6 +254,13 @@ export function initAnalytics(): void {
 }
 
 /**
+ * 获取当前设备硬件指纹(SHA-256 hex)
+ */
+export function getFingerprint(): string {
+  return getOrCreateClientId()
+}
+
+/**
  * 检查是否已启用埋点
  */
 export function isAnalyticsEnabled(): boolean {

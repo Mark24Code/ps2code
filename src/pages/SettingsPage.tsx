@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { App, AutoComplete, Button, Card, Descriptions, Input, Select, Space, Tag, Typography } from 'antd'
+import { App, AutoComplete, Button, Card, Descriptions, Input, Select, Space, Tag, Tooltip, Typography } from 'antd'
+import { CopyOutlined, CheckOutlined } from '@ant-design/icons'
 import type { AppSettings } from '@shared/types'
 
 const empty: AppSettings = {
@@ -36,6 +37,8 @@ export function SettingsPage(): JSX.Element {
   const [version, setVersion] = useState('')
   const [testing, setTesting] = useState(false)
   const [checking, setChecking] = useState(false)
+  const [fingerprint, setFingerprint] = useState('')
+  const [copied, setCopied] = useState(false)
   const [update, setUpdate] = useState<{
     hasUpdate: boolean
     latest?: string
@@ -51,6 +54,8 @@ export function SettingsPage(): JSX.Element {
       .then((d) => setDetected(d ? `${d.app}${d.version ? ' ' + d.version : ''}` : '未检测到'))
     // 从 auth.json 读取 apiKey
     window.api.authGet('deepseek').then(setApiKey).catch(() => {})
+    // 读取设备指纹
+    window.api.analyticsGetFingerprint().then(setFingerprint).catch(() => setFingerprint('获取失败'))
   }, [])
 
   const set = (patch: Partial<AppSettings>): void => setS((prev) => ({ ...prev, ...patch }))
@@ -89,6 +94,16 @@ export function SettingsPage(): JSX.Element {
   const check = async (): Promise<void> => {
     setUpdate(null)
     setUpdate(await window.api.checkUpdate())
+  }
+
+  const copyFingerprint = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(fingerprint)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      message.error('复制失败')
+    }
   }
 
   return (
@@ -193,6 +208,34 @@ export function SettingsPage(): JSX.Element {
             )}
             {update?.error && <Typography.Text type="danger">{update.error}</Typography.Text>}
           </Space>
+        </Card>
+
+        <Card title="设备信息" size="small">
+          <Descriptions column={1} size="small">
+            <Descriptions.Item label={
+              <Space size={4}>
+                <span>设备码</span>
+                <Tooltip title={copied ? '已复制' : '复制设备码'}>
+                  <span
+                    onClick={copyFingerprint}
+                    style={{ cursor: 'pointer', color: copied ? '#52c41a' : undefined }}
+                  >
+                    {copied ? <CheckOutlined /> : <CopyOutlined />}
+                  </span>
+                </Tooltip>
+              </Space>
+            }>
+              <Typography.Text
+                code
+                copyable={false}
+                style={{ fontSize: 11, wordBreak: 'break-all' }}
+              >
+                {fingerprint || '加载中…'}
+              </Typography.Text>
+            </Descriptions.Item>
+          </Descriptions>
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 0 }}>
+          </Typography.Paragraph>
         </Card>
 
         <Button type="primary" onClick={save}>

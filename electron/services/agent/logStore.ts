@@ -1,17 +1,33 @@
 import { homedir } from 'os'
 import { join } from 'path'
 import { appendFileSync, existsSync, mkdirSync } from 'fs'
+import { getFingerprint } from '../analytics'
 
 // 按对话累积 Agent 请求的详细日志(内存 + 落盘到 ~/.ps2code/sessions/<sid>/logs)。
+// 每条日志携带设备指纹用于追踪。
 
 export interface AgentLogEntry {
   ts: number
   level: 'info' | 'request' | 'response' | 'tool' | 'error' | 'context'
   message: string
+  /** 设备硬件指纹,用于日志追踪 */
+  fp?: string
 }
 
 const MAX_PER_CONV = 500
 const store = new Map<string, AgentLogEntry[]>()
+
+/** 缓存的设备指纹,首次 addLog 时懒加载 */
+let _fp: string | null = null
+function deviceFp(): string {
+  if (_fp) return _fp
+  try {
+    _fp = getFingerprint()
+  } catch {
+    _fp = 'unknown'
+  }
+  return _fp
+}
 
 function sessionsRoot(): string {
   return join(homedir(), '.ps2code', 'sessions')
@@ -41,7 +57,7 @@ export function addLog(
   level: AgentLogEntry['level'],
   message: string
 ): void {
-  const entry: AgentLogEntry = { ts: Date.now(), level, message }
+  const entry: AgentLogEntry = { ts: Date.now(), level, message, fp: deviceFp() }
   const list = store.get(conversationId) ?? []
   list.push(entry)
   if (list.length > MAX_PER_CONV) list.splice(0, list.length - MAX_PER_CONV)

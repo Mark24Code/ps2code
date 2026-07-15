@@ -20,6 +20,7 @@ const api = {
   analyticsStatus: (): Promise<boolean> => ipcRenderer.invoke(IPC.analyticsStatus),
   analyticsSetSecret: (secret: string): Promise<boolean> => ipcRenderer.invoke(IPC.analyticsSetSecret, secret),
   analyticsDisable: (): Promise<boolean> => ipcRenderer.invoke(IPC.analyticsDisable),
+  analyticsGetFingerprint: (): Promise<string> => ipcRenderer.invoke(IPC.analyticsGetFingerprint),
   ping: (): Promise<string> => ipcRenderer.invoke(IPC.ping),
   appVersion: (): Promise<string> => ipcRenderer.invoke(IPC.appVersion),
   openPath: (p: string): Promise<void> => ipcRenderer.invoke(IPC.openPath, p),

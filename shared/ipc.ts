@@ -93,6 +93,7 @@ export const IPC = {
   analyticsStatus: 'analytics:status',
   analyticsSetSecret: 'analytics:setSecret',
   analyticsDisable: 'analytics:disable',
+  analyticsGetFingerprint: 'analytics:getFingerprint',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]
