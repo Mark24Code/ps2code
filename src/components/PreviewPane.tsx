@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { App, Button, Checkbox, Divider, Empty, Input, Modal, Progress, Tooltip, Typography } from 'antd'
-import { AppstoreOutlined, DeleteOutlined, ExportOutlined, FolderOpenOutlined, FolderOutlined, SortAscendingOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, DeleteOutlined, ExportOutlined, FolderOpenOutlined, FolderOutlined, SortAscendingOutlined, SortDescendingOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import type { ArchiveFolder, Conversation } from '@shared/types'
 
 interface Props {
@@ -274,7 +274,7 @@ export function PreviewPane({ conversation, nonce, exporting, onCountChange }: P
         </Tooltip>
         <span style={{ borderLeft: '1px solid var(--border)', height: 18, margin: '0 2px' }} />
         <Tooltip title={sortAsc ? '从旧到新' : '从新到旧'}>
-          <Button type="text" size="small" icon={<SortAscendingOutlined style={{ transform: sortAsc ? 'scaleY(1)' : 'scaleY(-1)' }} />} onClick={() => setSortAsc((v) => !v)}
+          <Button type="text" size="small" icon={sortAsc ? <SortAscendingOutlined /> : <SortDescendingOutlined />} onClick={() => setSortAsc((v) => !v)}
             style={{ color: 'var(--text-2)', padding: '0 4px' }} />
         </Tooltip>
         <Tooltip title="打开临时目录">
