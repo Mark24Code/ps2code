@@ -178,6 +178,34 @@ export async function createSnapshot(projectId: number): Promise<CreateSnapshotR
   const label = `v${nextVersion}`
   const layerTreeJson = JSON.stringify(meta.tree)
 
+  // 生成变更概要
+  let changeMessage = ''
+  if (latest) {
+    try {
+      const prevRow = db.getVersionSnapshotRow(projectId, latest.version)
+      if (prevRow) {
+        const prevLayers: PsdLayerNode[] = JSON.parse(prevRow.layerTree)
+        const summary = computeLayerSummary(prevLayers, meta.tree)
+        const parts: string[] = []
+        if (summary.modified.length > 0) {
+          const names = summary.modified.map((m) => m.name).slice(0, 3)
+          parts.push(`修改${names.join('、')}${summary.modified.length > 3 ? '等' : ''}`)
+        }
+        if (summary.added.length > 0) {
+          const names = summary.added.map((m) => m.name).slice(0, 2)
+          parts.push(`新增${names.join('、')}${summary.added.length > 2 ? '等' : ''}`)
+        }
+        if (summary.deleted.length > 0) {
+          const names = summary.deleted.map((m) => m.name).slice(0, 2)
+          parts.push(`删除${names.join('、')}${summary.deleted.length > 2 ? '等' : ''}`)
+        }
+        changeMessage = parts.join('，').slice(0, 30)
+      }
+    } catch {
+      /* 生成概要失败不阻断 */
+    }
+  }
+
   const snapshot = db.createVersionSnapshot(
     projectId,
     nextVersion,
@@ -185,7 +213,8 @@ export async function createSnapshot(projectId: number): Promise<CreateSnapshotR
     mtime,
     size,
     hash,
-    layerTreeJson
+    layerTreeJson,
+    changeMessage || undefined
   )
 
   return { created: true, snapshot }

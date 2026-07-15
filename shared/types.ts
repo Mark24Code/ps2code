@@ -27,6 +27,7 @@ export interface VersionSnapshot {
   size: string       // 文件大小字符串("2.4 MB")
   layerHash: string  // 图层树确定性 hash,用于判断内容是否真正变化
   createdAt: string  // 快照创建时间
+  changeMessage?: string // 变更概要(<30 字),创建快照时由 diff 生成
 }
 
 // version_snapshots 表行(含 layerTree JSON)

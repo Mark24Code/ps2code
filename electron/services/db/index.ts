@@ -183,7 +183,8 @@ function mapVersionSnapshot(r: any): VersionSnapshot {
     mtime: r.mtime,
     size: r.size,
     layerHash: r.layer_hash,
-    createdAt: r.created_at
+    createdAt: r.created_at,
+    changeMessage: r.change_message || undefined
   }
 }
 
@@ -201,14 +202,15 @@ export function createVersionSnapshot(
   mtime: string,
   size: string,
   layerHash: string,
-  layerTree: string
+  layerTree: string,
+  changeMessage?: string
 ): VersionSnapshot {
   const info = db
     .prepare(
-      `INSERT INTO version_snapshots (project_id, version, label, mtime, size, layer_hash, layer_tree)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO version_snapshots (project_id, version, label, mtime, size, layer_hash, layer_tree, change_message)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(projectId, version, label, mtime, size, layerHash, layerTree)
+    .run(projectId, version, label, mtime, size, layerHash, layerTree, changeMessage ?? '')
   return mapVersionSnapshot(
     db.prepare('SELECT * FROM version_snapshots WHERE id = ?').get(info.lastInsertRowid)
   )

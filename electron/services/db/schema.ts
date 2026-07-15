@@ -53,6 +53,9 @@ export function createSchema(db: Database.Database): void {
     );
   `)
 
+  // 迁移:为既有库补齐新列
+  ensureColumn(db, 'version_snapshots', 'change_message', 'TEXT NOT NULL DEFAULT \'\'')
+
   // 迁移:为既有库补齐新列(CREATE TABLE IF NOT EXISTS 不会给旧表加列)。
   ensureColumn(db, 'conversations', 'opt_compress', 'INTEGER NOT NULL DEFAULT 1')
 }

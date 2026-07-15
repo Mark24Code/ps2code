@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Modal, Spin, Typography } from 'antd'
-import { ClockCircleOutlined } from '@ant-design/icons'
+import { ClockCircleOutlined, FileTextOutlined } from '@ant-design/icons'
 import type { VersionSnapshot } from '@shared/types'
 
 interface Props {
@@ -82,7 +82,6 @@ export function VersionTimeline({
                   <span className="vt-name">{v.label}</span>
                   {isLatest && <span className="vt-latest-tag">最新</span>}
                   {isSelected && !isLatest && <span className="vt-diff-tag">对比中</span>}
-                  <span className="vt-time">{v.createdAt}</span>
                 </div>
                 <div className="vt-sub">
                   <ClockCircleOutlined style={{ marginRight: 4, fontSize: 11 }} />
@@ -90,6 +89,12 @@ export function VersionTimeline({
                   <span style={{ margin: '0 8px', color: 'var(--text-3)' }}>·</span>
                   {v.size}
                 </div>
+                {v.changeMessage && (
+                  <div className="vt-sub" style={{ marginTop: 6 }}>
+                    <FileTextOutlined style={{ marginRight: 4, fontSize: 11 }} />
+                    {v.changeMessage}
+                  </div>
+                )}
               </div>
             )
           })}
