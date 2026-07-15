@@ -115,7 +115,37 @@ export function registerIpc(): void {
   // ---------- Photoshop ----------
   ipcMain.handle(IPC.psDetect, () => getBridge().detect())
   ipcMain.handle(IPC.psTest, () => testConnection())
-  ipcMain.handle(IPC.psOpenDesign, (_e, psdPath: string) => ensureDesignReady(psdPath))
+  ipcMain.handle(IPC.psOpenDesign, async (_e, psdPath: string) => {
+    // Windows 上 DoJavaScript 的 app.open 可能受沙箱限制,走 COM 直开
+    if (process.platform === 'win32') {
+      const { execSync } = await import('child_process')
+      const { mkdtempSync, writeFileSync, rmSync } = await import('fs')
+      const { join } = await import('path')
+      const { tmpdir } = await import('os')
+      const dir = mkdtempSync(join(tmpdir(), 'ps2code-ps-'))
+      const ps1 = join(dir, 'open.ps1')
+      const esc = psdPath.replace(/'/g, "''")
+      const psScript = `$ErrorActionPreference = 'Stop'
+$a = New-Object -ComObject Photoshop.Application
+$a.Visible = $true
+$found = $false
+for ($i = 1; $i -le $a.Documents.Count; $i++) {
+  if ($a.Documents.Item($i).FullName -eq '${esc}') { $found = $true; break }
+}
+if (-not $found) { $a.Open('${esc}') }
+Write-Output 'OK'`
+      writeFileSync(ps1, '﻿' + psScript, 'utf8')
+      try {
+        execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${ps1}"`, { timeout: 30000 })
+        return { ok: true, message: '已就绪' }
+      } catch (e) {
+        return { ok: false, message: `打开失败: ${(e as Error).message}` }
+      } finally {
+        try { rmSync(dir, { recursive: true, force: true }) } catch { /* */ }
+      }
+    }
+    return ensureDesignReady(psdPath)
+  })
   ipcMain.handle(IPC.psActivate, async () => {
     await getBridge().activate()
   })
