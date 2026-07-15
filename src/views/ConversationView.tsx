@@ -549,11 +549,12 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
 
       {/* 右侧面板(可拖拽宽度) */}
       <div style={{ width: rightWidth, height: '100%', overflow: 'hidden', borderLeft: '1px solid var(--border)', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
-        {/* 自定义 Tab 栏 */}
+        {/* 自定义 Tab 栏 — 可拖拽窗口 */}
         <div style={{
           display: 'flex', flexShrink: 0,
           borderBottom: '1px solid var(--border)',
-          padding: '0 12px'
+          padding: '0 12px',
+          WebkitAppRegion: 'drag'
         }}>
           {(
             [
@@ -576,7 +577,8 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
                 userSelect: 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 6
+                gap: 6,
+                WebkitAppRegion: 'no-drag'
               }}
             >
               {label}
