@@ -60,7 +60,10 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.projectList, () => db.listProjects())
   ipcMain.handle(IPC.projectGet, (_e, id: number) => db.getProject(id))
   ipcMain.handle(IPC.projectUpdate, (_e, id: number, name: string) => db.updateProject(id, name))
-  ipcMain.handle(IPC.projectDelete, (_e, id: number) => db.deleteProject(id))
+  ipcMain.handle(IPC.projectDelete, (_e, id: number) => {
+    sendEvent('project_delete')
+    return db.deleteProject(id)
+  })
 
   // ---------- 对话 ----------
   ipcMain.handle(IPC.convList, (_e, projectId: number) => db.listConversations(projectId))
@@ -78,7 +81,10 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.convUpdate, (_e, id: string, patch: Partial<Conversation>) =>
     db.updateConversation(id, patch)
   )
-  ipcMain.handle(IPC.convDelete, (_e, id: string) => db.deleteConversation(id))
+  ipcMain.handle(IPC.convDelete, (_e, id: string) => {
+    sendEvent('conversation_delete')
+    return db.deleteConversation(id)
+  })
 
   // ---------- 消息 ----------
   ipcMain.handle(IPC.msgList, (_e, conversationId: string) => db.listMessages(conversationId))
@@ -86,7 +92,20 @@ export function registerIpc(): void {
 
   // ---------- 设置 ----------
   ipcMain.handle(IPC.settingsGet, () => db.getSettings())
-  ipcMain.handle(IPC.settingsSet, (_e, patch: Partial<AppSettings>) => db.setSettings(patch))
+  ipcMain.handle(IPC.settingsSet, (_e, patch: Partial<AppSettings>) => {
+    const prev = db.getSettings()
+    const result = db.setSettings(patch)
+    // 检测 API 相关的变更
+    if (('apiProvider' in patch && patch.apiProvider !== prev.apiProvider) ||
+        ('apiModel' in patch && patch.apiModel !== prev.apiModel)) {
+      sendEvent('settings_api_change', {
+        provider: result.apiProvider,
+        model: result.apiModel,
+      })
+    }
+    sendEvent('settings_change')
+    return result
+  })
 
   // ---------- 认证(auth.json) ----------
   ipcMain.handle(IPC.authGet, async (_e, provider: string): Promise<string> => {
@@ -143,7 +162,12 @@ export function registerIpc(): void {
 
   // ---------- Photoshop ----------
   ipcMain.handle(IPC.psDetect, () => getBridge().detect())
-  ipcMain.handle(IPC.psTest, () => testConnection())
+  ipcMain.handle(IPC.psTest, async () => {
+    const t0 = performance.now()
+    const result = await testConnection()
+    sendEvent(result.ok ? 'ps_connected' : 'ps_connect_fail', { duration_ms: Math.round(performance.now() - t0) })
+    return result
+  })
   ipcMain.handle(IPC.psOpenDesign, async (_e, psdPath: string) => {
     // Windows 上 DoJavaScript 的 app.open 可能受沙箱限制,走 COM 直开
     if (process.platform === 'win32') {
@@ -183,7 +207,7 @@ Write-Output 'OK'`
   ipcMain.handle(
     IPC.agentSend,
     async (_e, payload: { conversationId: string; text: string }) => {
-      sendEvent('message_send')
+      const t0 = performance.now()
       db.addMessage({ conversationId: payload.conversationId, role: 'user', content: payload.text })
       // 首条用户消息 → 自动生成对话标题
       const conv = db.getConversation(payload.conversationId)
@@ -191,6 +215,8 @@ Write-Output 'OK'`
         const title = payload.text.replace(/\s+/g, ' ').trim().slice(0, 20) || '新对话'
         db.updateConversation(payload.conversationId, { title })
       }
+      // 追踪本轮对话中 tool_use → tool_result 耗时
+      const toolTimers = new Map<string, number>()
       const emit = (event: AgentStreamEvent): void => {
         getMainWindow()?.webContents.send(IPC.agentStream, {
           conversationId: payload.conversationId,
@@ -205,17 +231,30 @@ Write-Output 'OK'`
               content: event.text
             })
         } else if (event.type === 'tool_use') {
+          toolTimers.set(event.name, performance.now())
           db.addMessage({
             conversationId: payload.conversationId,
             role: 'tool',
             content: `→ 调用工具 ${event.name}`
           })
         } else if (event.type === 'tool_result') {
+          // tool 执行耗时
+          const toolStart = toolTimers.get(event.name)
+          if (toolStart) {
+            sendEvent('agent_action', {
+              tool: event.name,
+              duration_ms: Math.round(performance.now() - toolStart),
+            })
+            toolTimers.delete(event.name)
+          }
           db.addMessage({
             conversationId: payload.conversationId,
             role: 'tool',
             content: event.text
           })
+        } else if (event.type === 'result') {
+          // 整轮 Agent 处理耗时
+          sendEvent('message_send', { duration_ms: Math.round(performance.now() - t0) })
         }
       }
       await runAgent(payload.conversationId, payload.text, emit)
@@ -235,6 +274,7 @@ Write-Output 'OK'`
 
   // ---------- 导出确认: tmp → exportDir ----------
   ipcMain.handle(IPC.exportConfirm, async (_e, conversationId: string, names?: string[]) => {
+    const t0 = performance.now()
     const conv = db.getConversation(conversationId)
     if (!conv) throw new Error('对话不存在')
     const project = db.getProject(conv.projectId)
@@ -274,7 +314,7 @@ Write-Output 'OK'`
       /* 布局清单为附加产物,失败不影响导出结果 */
     }
 
-    sendEvent('export_confirm', { count: filtered.length })
+    sendEvent('export_confirm', { count: filtered.length, duration_ms: Math.round(performance.now() - t0) })
     return { ok: true, dir: dest, count: filtered.length }
   })
 
@@ -459,6 +499,7 @@ Write-Output 'OK'`
 
   // 基于已有 _meta.json 重新切图
   ipcMain.handle(IPC.previewRecut, async (_e, conversationId: string): Promise<RecutResult> => {
+    const t0 = performance.now()
     const conv = db.getConversation(conversationId)
     if (!conv) throw new Error('对话不存在')
     const project = db.getProject(conv.projectId)
@@ -564,7 +605,12 @@ Write-Output 'OK'`
       successes, failures
     })
 
-    sendEvent('export_recut', { success: successes.length, fail: failures.length })
+    sendEvent('export_recut', {
+      success: successes.length,
+      fail: failures.length,
+      duration_ms: Math.round(performance.now() - t0),
+      total: successes.length + failures.length,
+    })
     return { successes, failures, archivePath }
   })
 }
