@@ -2,6 +2,25 @@
 
 通过 AI 对话驱动的 Photoshop 设计稿导出工具。连接本地 Adobe Photoshop，让 AI Agent 理解图层结构、执行切图导出，并自动追踪版本变更。
 
+![demo](user-guide/demo.mov)
+
+---
+
+## 优点
+
+### ⚡ 速度快
+AI Agent 直接在本地 Photoshop 中操作图层，无需上传设计稿到云端。图层搜索、重命名、导出全部在毫秒~秒级完成。
+
+### 💰 成本低
+AI 只在「理解用户意图 → 生成操作指令」阶段消耗 API Token。**导出本身由 Photoshop 本地脚本执行，完全不消耗 AI Token。**  
+自动重切功能也是纯本地操作（读取已有配置 → 调 Photoshop 重新导出），**零 AI 成本**。
+
+### ♻️ 可复用
+每次导出都会生成 `_meta.json`，记录每个切图的图层 ID、路径、坐标。后续：
+- **自动重切**：设计稿修改后一键重新导出，无需重新描述需求
+- **增量导出**：基于已有配置，只导出变更的部分
+- **跨对话复用**：同一项目的切图配置可在不同对话间共享
+
 ---
 
 ## Features
@@ -97,6 +116,8 @@
 3. 基于已有切图配置（图层 ID/路径）调用 Photoshop 重新切图
 4. 实时展示进度和结果报告（成功/失败列表）
 
+自动重切不经过 AI Agent，**零 Token 消耗**。
+
 **归档目录**：`~/.ps2code/archives/<对话ID>/`，支持在「导出预览」面板查看和打开
 
 ---
@@ -114,8 +135,6 @@
 
 ## 界面概览
 
-![demo](user-guide/demo.mov)
-
 | 区域 | 功能 |
 |------|------|
 | 左侧栏 | 项目列表、对话历史 |
@@ -125,42 +144,6 @@
 
 ---
 
-## 技术栈
-
-| 层 | 技术 |
-|---|---|
-| 桌面框架 | Electron 37 |
-| 前端 | React 18 + TypeScript + Vite 5 |
-| UI 库 | Ant Design 6 |
-| 数据库 | better-sqlite3 |
-| PSD 解析 | ag-psd |
-| 图片处理 | sharp（PNG 压缩） |
-| AI Agent | pi-coding-agent SDK |
-| Photoshop 通信 | ExtendScript (JSX) + AppleScript |
-
----
-
-## 开发
-
-```bash
-# 安装依赖
-npm install
-
-# 开发模式
-npm run dev
-
-# macOS 构建
-npm run dist:mac
-
-# Windows 构建（需在 Windows 上执行）
-npm run dist:win
-```
-
-> Windows 构建需在 Windows 环境运行。`better-sqlite3`、`sharp` 等原生模块无法从 macOS 交叉编译。  
-> 推荐在 Windows 开发机上 clone 项目后执行 `npm install && npm run dist:win`。
-
----
-
-## 许可证
+## 许可
 
 MIT
