@@ -32,8 +32,13 @@ mac:
   identity: '-'
 win:
   target:
-    - nsis
-  artifactName: ${productName}-${version}.${ext}
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-x64.${ext}
+  # macOS 上交叉编译 Windows 需 Docker + builder-wine 镜像:
+  # dist:win:docker 脚本已配置 dockerImage
+  # Windows 原生构建直接运行: npm run dist:win
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true

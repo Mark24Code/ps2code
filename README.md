@@ -149,11 +149,15 @@ npm install
 # 开发模式
 npm run dev
 
-# 构建
-npm run build
-npm run dist:mac   # macOS DMG
-npm run dist:win   # Windows
+# macOS 构建
+npm run dist:mac
+
+# Windows 构建（需在 Windows 上执行）
+npm run dist:win
 ```
+
+> Windows 构建需在 Windows 环境运行。`better-sqlite3`、`sharp` 等原生模块无法从 macOS 交叉编译。  
+> 推荐在 Windows 开发机上 clone 项目后执行 `npm install && npm run dist:win`。
 
 ---
 

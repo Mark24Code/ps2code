@@ -16,7 +16,7 @@
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "dist:mac": "electron-vite build && electron-builder --mac",
-    "dist:win": "electron-vite build && electron-builder --win",
+    "dist:win": "electron-vite build && electron-builder --win --x64",
     "test": "vitest run",
     "test:watch": "vitest"
   },
