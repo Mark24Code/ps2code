@@ -60,38 +60,26 @@ jobs:
           path: dist/PS2Code-*-x64.exe
           if-no-files-found: error
 
-  # 汇总:列出所有构建产物
+  # 汇总:展示 mac + win 产物下载链接
   summarize:
     needs: [build-mac-arm64, build-win-x64]
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-
-      - name: List artifacts in summary
-        shell: bash
-        run: |
-          echo "## ✅ 构建完成" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 下载产物" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| 平台 | 文件 | 大小 |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|------|------|" >> $GITHUB_STEP_SUMMARY
-          for dir in PS2Code-*/; do
-            if [ -d "$dir" ]; then
-              file=$(ls "$dir" 2>/dev/null | head -1)
-              if [ -n "$file" ]; then
-                size=$(du -h "$dir/$file" 2>/dev/null | cut -f1)
-                echo "| $dir | $file | $size |" >> $GITHUB_STEP_SUMMARY
-              fi
-            fi
-          done
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> 产物可从 Actions 页面 Artifacts 区域下载" >> $GITHUB_STEP_SUMMARY
-          echo ""
-          echo "=== 构建产物清单 ==="
-          for dir in PS2Code-*/; do
-            if [ -d "$dir" ]; then
-              ls -lh "$dir"
-            fi
-          done
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
+            let summary = '## ✅ 构建完成\n\n';
+            for (const art of data.artifacts) {
+              const url = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts/${art.id}`;
+              summary += `- **${art.name}** (<code>${art.sizeInBytes > 1048576 ? (art.sizeInBytes / 1048576).toFixed(1) + ' MB' : (art.sizeInBytes / 1024).toFixed(1) + ' KB'}</code>) — Artifact download URL: ${url}\n`;
+            }
+            core.summary = summary;
+            await core.summary.write();
+            console.log(summary);
