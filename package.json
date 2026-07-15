@@ -15,8 +15,8 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
-    "dist:mac": "electron-vite build && electron-builder --mac",
-    "dist:win": "electron-vite build && electron-builder --win --x64",
+    "dist:mac": "electron-vite build && electron-builder --mac --publish=never",
+    "dist:win": "electron-vite build && electron-builder --win --x64 --publish=never",
     "test": "vitest run",
     "test:watch": "vitest"
   },
