@@ -5,7 +5,6 @@ import type { AppSettings } from '@shared/types'
 const empty: AppSettings = {
   psPath: '',
   apiProvider: 'deepseek',
-  apiKey: '',
   apiModel: 'deepseek-v4-flash',
   defaultExportDir: ''
 }
@@ -32,6 +31,7 @@ const MODEL_SUGGESTIONS: Record<string, string[]> = {
 export function SettingsPage(): JSX.Element {
   const { message } = App.useApp()
   const [s, setS] = useState<AppSettings>(empty)
+  const [apiKey, setApiKey] = useState('')
   const [detected, setDetected] = useState('检测中…')
   const [version, setVersion] = useState('')
   const [testing, setTesting] = useState(false)
@@ -49,12 +49,16 @@ export function SettingsPage(): JSX.Element {
     window.api
       .psDetect()
       .then((d) => setDetected(d ? `${d.app}${d.version ? ' ' + d.version : ''}` : '未检测到'))
+    // 从 auth.json 读取 apiKey
+    window.api.authGet('deepseek').then(setApiKey).catch(() => {})
   }, [])
 
   const set = (patch: Partial<AppSettings>): void => setS((prev) => ({ ...prev, ...patch }))
 
   const save = async (): Promise<void> => {
     await window.api.settingsSet(s)
+    // apiKey 单独存到 auth.json
+    await window.api.authSet(s.apiProvider, apiKey)
     message.success('已保存')
   }
 
@@ -68,10 +72,9 @@ export function SettingsPage(): JSX.Element {
 
   const checkAgent = async (): Promise<void> => {
     setChecking(true)
-    // 用当前(未保存的)草稿配置检查
     const res = await window.api.agentCheck({
       apiProvider: s.apiProvider,
-      apiKey: s.apiKey,
+      apiKey,
       apiModel: s.apiModel
     })
     setChecking(false)
@@ -125,9 +128,9 @@ export function SettingsPage(): JSX.Element {
             <div>
               <Typography.Text type="secondary">API 密钥</Typography.Text>
               <Input.Password
-                value={s.apiKey}
+                value={apiKey}
                 placeholder="sk-..."
-                onChange={(e) => set({ apiKey: e.target.value })}
+                onChange={(e) => setApiKey(e.target.value)}
               />
             </div>
             <div>

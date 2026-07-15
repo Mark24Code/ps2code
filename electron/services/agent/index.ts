@@ -205,7 +205,17 @@ export async function runAgent(
     return
   }
   const settings = getSettings()
-  const apiConfig = resolveApiConfig(settings)
+  // 从 auth.json 读取 apiKey(不再从 config.json 读取)
+  let authKey = ''
+  try {
+    const { readFileSync, existsSync } = await import('fs')
+    if (existsSync(authFilePath())) {
+      const authData = JSON.parse(readFileSync(authFilePath(), 'utf8'))
+      const authProvider = settings.apiProvider || 'deepseek'
+      authKey = authData?.apiKeys?.[authProvider] || ''
+    }
+  } catch { /* auth.json 可能还不存在 */ }
+  const apiConfig = resolveApiConfig({ ...settings, apiKey: authKey })
   if (!apiConfig.apiKey) {
     emit({
       type: 'error',
@@ -394,7 +404,19 @@ export async function checkAgentConfig(draft?: {
   apiModel?: string
 }): Promise<{ ok: boolean; message: string }> {
   const settings = draft ?? getSettings()
-  const cfg = resolveApiConfig(settings)
+  // draft 没传 apiKey 时从 auth.json 读取
+  let keyForCheck = draft?.apiKey ?? ''
+  if (!keyForCheck) {
+    try {
+      const { readFileSync, existsSync } = await import('fs')
+      if (existsSync(authFilePath())) {
+        const authData = JSON.parse(readFileSync(authFilePath(), 'utf8'))
+        const provider = settings.apiProvider || 'deepseek'
+        keyForCheck = authData?.apiKeys?.[provider] || ''
+      }
+    } catch { /* */ }
+  }
+  const cfg = resolveApiConfig({ ...settings, apiKey: keyForCheck })
   if (!cfg.apiKey) {
     return { ok: false, message: '缺少 API 密钥(在设置中填写,或设置对应环境变量)' }
   }

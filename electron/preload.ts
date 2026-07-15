@@ -52,6 +52,11 @@ const api = {
   settingsSet: (patch: Partial<AppSettings>): Promise<AppSettings> =>
     ipcRenderer.invoke(IPC.settingsSet, patch),
 
+  // 认证(auth.json)
+  authGet: (provider: string): Promise<string> => ipcRenderer.invoke(IPC.authGet, provider),
+  authSet: (provider: string, apiKey: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.authSet, provider, apiKey),
+
   // PSD
   psdRead: (psdPath: string): Promise<PsdMeta> => ipcRenderer.invoke(IPC.psdRead, psdPath),
 

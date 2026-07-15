@@ -29,6 +29,10 @@ export const IPC = {
   settingsGet: 'db:settings:get',
   settingsSet: 'db:settings:set',
 
+  // 认证(auth.json,与 config.json 分离)
+  authGet: 'auth:get',       // 读取某 provider 的 apiKey
+  authSet: 'auth:set',       // 写入某 provider 的 apiKey
+
   // PSD
   psdRead: 'psd:read',
 

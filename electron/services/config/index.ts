@@ -9,12 +9,11 @@ import type { AppSettings } from '../../../shared/types'
 const DEFAULT_SETTINGS: AppSettings = {
   psPath: '',
   apiProvider: 'deepseek',
-  apiKey: '',
   apiModel: 'deepseek-v4-flash',
   defaultExportDir: ''
 }
 
-function configDir(): string {
+export function configDir(): string {
   return join(homedir(), '.ps2code')
 }
 function configFile(): string {

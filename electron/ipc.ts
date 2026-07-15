@@ -10,6 +10,7 @@ import * as db from './services/db'
 import { readPsdMeta } from './services/psd'
 import { buildLayerCache, getLayerMeta } from './services/psd/layerCache'
 import { buildLayoutManifest, type ExportMetaEntry } from './services/psd/layout'
+import { authFilePath, configDir } from './services/config'
 import * as versionService from './services/version'
 import { getBridge } from './services/photoshop'
 import { ensureDesignReady, testConnection } from './services/photoshop/operations'
@@ -82,6 +83,30 @@ export function registerIpc(): void {
   // ---------- 设置 ----------
   ipcMain.handle(IPC.settingsGet, () => db.getSettings())
   ipcMain.handle(IPC.settingsSet, (_e, patch: Partial<AppSettings>) => db.setSettings(patch))
+
+  // ---------- 认证(auth.json) ----------
+  ipcMain.handle(IPC.authGet, async (_e, provider: string): Promise<string> => {
+    const { readFileSync, existsSync } = await import('fs')
+    const fp = authFilePath()
+    if (!existsSync(fp)) return ''
+    try {
+      const raw = JSON.parse(readFileSync(fp, 'utf8'))
+      return raw?.apiKeys?.[provider] || ''
+    } catch { return '' }
+  })
+  ipcMain.handle(IPC.authSet, async (_e, provider: string, apiKey: string): Promise<void> => {
+    const { readFileSync, writeFileSync, existsSync, mkdirSync } = await import('fs')
+    const dir = configDir()
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    const fp = authFilePath()
+    let data: Record<string, any> = {}
+    try {
+      if (existsSync(fp)) data = JSON.parse(readFileSync(fp, 'utf8'))
+    } catch { /* 文件损坏,从头创建 */ }
+    if (!data.apiKeys) data.apiKeys = {}
+    data.apiKeys[provider] = apiKey
+    writeFileSync(fp, JSON.stringify(data, null, 2), 'utf8')
+  })
 
   // ---------- PSD ----------
   ipcMain.handle(IPC.psdRead, (_e, psdPath: string) => readPsdMeta(psdPath))
