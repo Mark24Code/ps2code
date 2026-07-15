@@ -3,6 +3,7 @@ import { join } from 'path'
 import { registerIpc } from './ipc'
 import { initDatabase } from './services/db'
 import { detectAndPersistPsPath } from './services/photoshop'
+import { initAnalytics } from './services/analytics'
 import { IPC } from '../shared/ipc'
 import { existsSync } from 'fs'
 
@@ -80,6 +81,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   initDatabase()
   registerIpc()
+  initAnalytics()
   // 设置应用名称和图标
   app.setName('PS2Code')
   setAppIcon()

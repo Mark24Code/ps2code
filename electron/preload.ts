@@ -14,6 +14,12 @@ import type {
 } from '../shared/types'
 
 const api = {
+  // Analytics
+  analyticsEvent: (name: string, params?: Record<string, string | number | boolean | undefined>): Promise<void> =>
+    ipcRenderer.invoke(IPC.analyticsEvent, name, params),
+  analyticsStatus: (): Promise<boolean> => ipcRenderer.invoke(IPC.analyticsStatus),
+  analyticsSetSecret: (secret: string): Promise<boolean> => ipcRenderer.invoke(IPC.analyticsSetSecret, secret),
+  analyticsDisable: (): Promise<boolean> => ipcRenderer.invoke(IPC.analyticsDisable),
   ping: (): Promise<string> => ipcRenderer.invoke(IPC.ping),
   appVersion: (): Promise<string> => ipcRenderer.invoke(IPC.appVersion),
   openPath: (p: string): Promise<void> => ipcRenderer.invoke(IPC.openPath, p),

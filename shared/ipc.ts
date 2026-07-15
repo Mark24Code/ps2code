@@ -87,6 +87,12 @@ export const IPC = {
   // 重切
   previewRecut: 'recut:run',
   recutStream: 'recut:stream',
+
+  // Analytics
+  analyticsEvent: 'analytics:event',
+  analyticsStatus: 'analytics:status',
+  analyticsSetSecret: 'analytics:setSecret',
+  analyticsDisable: 'analytics:disable',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

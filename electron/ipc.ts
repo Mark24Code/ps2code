@@ -20,6 +20,8 @@ import { cancelAgent, checkAgentConfig, resolveConfirm, runAgent } from './servi
 import { getLogs, logPath } from './services/agent/logStore'
 import { checkUpdate } from './services/updater'
 import { getMainWindow } from './main'
+import { sendEvent, isAnalyticsEnabled, setApiSecret, disableAnalytics } from './services/analytics'
+import type { AnalyticsEventName } from '../shared/analytics'
 
 function convTmpDir(conversationId: string): string {
   return join(app.getPath('home'), '.ps2code', 'sessions', String(conversationId), 'tmp')
@@ -52,6 +54,7 @@ export function registerIpc(): void {
   // ---------- 项目 ----------
   ipcMain.handle(IPC.projectImport, (_e, psdPath: string) => {
     const name = basename(psdPath).replace(/\.(psd|psb)$/i, '')
+    sendEvent('project_import', { fileExt: extname(psdPath).toLowerCase() })
     return db.importProject(psdPath, name)
   })
   ipcMain.handle(IPC.projectList, () => db.listProjects())
@@ -68,6 +71,7 @@ export function registerIpc(): void {
     const conv = db.createConversation(projectId, '', defaultExport)
     const tmp = convTmpDir(conv.id)
     await mkdir(tmp, { recursive: true })
+    sendEvent('conversation_create')
     return db.updateConversation(conv.id, { tmpDir: tmp } as Partial<Conversation>)
   })
   ipcMain.handle(IPC.convGet, (_e, id: string) => db.getConversation(id))
@@ -179,6 +183,7 @@ Write-Output 'OK'`
   ipcMain.handle(
     IPC.agentSend,
     async (_e, payload: { conversationId: string; text: string }) => {
+      sendEvent('message_send')
       db.addMessage({ conversationId: payload.conversationId, role: 'user', content: payload.text })
       // 首条用户消息 → 自动生成对话标题
       const conv = db.getConversation(payload.conversationId)
@@ -269,6 +274,7 @@ Write-Output 'OK'`
       /* 布局清单为附加产物,失败不影响导出结果 */
     }
 
+    sendEvent('export_confirm', { count: filtered.length })
     return { ok: true, dir: dest, count: filtered.length }
   })
 
@@ -441,6 +447,14 @@ Write-Output 'OK'`
   function emitRecutProgress(conversationId: string, progress: import('../shared/types').RecutProgress): void {
     getMainWindow()?.webContents.send(IPC.recutStream, { conversationId, progress })
   }
+
+  // ---------- Analytics ----------
+  ipcMain.handle(IPC.analyticsEvent, (_e, name: string, params?: Record<string, string | number | boolean | undefined>) =>
+    sendEvent(name as AnalyticsEventName, params)
+  )
+  ipcMain.handle(IPC.analyticsStatus, () => isAnalyticsEnabled())
+  ipcMain.handle(IPC.analyticsSetSecret, (_e, secret: string) => { setApiSecret(secret); return true })
+  ipcMain.handle(IPC.analyticsDisable, () => { disableAnalytics(); return true })
 
   // 基于已有 _meta.json 重新切图
   ipcMain.handle(IPC.previewRecut, async (_e, conversationId: string): Promise<RecutResult> => {
