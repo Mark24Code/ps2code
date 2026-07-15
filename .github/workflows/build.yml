@@ -1,0 +1,57 @@
+name: Build
+
+on:
+  push:
+    branches: [main, dev]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-mac-arm64:
+    runs-on: macos-latest  # GitHub Actions 默认 Apple Silicon
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & package (macOS ARM64)
+        run: npm run dist:mac
+        env:
+          # ad-hoc 签名:无证书也可构建,产物仅限本地使用
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS2Code-mac-arm64
+          path: dist/PS2Code-*.dmg
+          if-no-files-found: error
+
+  build-win-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build & package (Windows x64)
+        run: npm run dist:win
+
+      - name: Upload NSIS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS2Code-win-x64
+          path: dist/PS2Code-*-x64.exe
+          if-no-files-found: error
