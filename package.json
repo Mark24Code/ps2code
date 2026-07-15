@@ -1,6 +1,6 @@
 {
   "name": "ps2code",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "帮助管理本地 PSD 设计稿,通过 Agent 对话调用 Photoshop 做图层操作与导出",
   "author": "ps2code",
   "main": "out/main/index.js",
