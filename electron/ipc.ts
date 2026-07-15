@@ -564,6 +564,7 @@ Write-Output 'OK'`
       successes, failures
     })
 
+    sendEvent('export_recut', { success: successes.length, fail: failures.length })
     return { successes, failures, archivePath }
   })
 }
