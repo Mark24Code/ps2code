@@ -169,7 +169,7 @@ export function ConversationView({ conversationId, onConversationUpdated, onConv
           // 版本有更新 → 展示升级箭头(10秒后自动消失)
           if (r.created) {
             setJustUpgraded(true)
-            setTimeout(() => setJustUpgraded(false), 10000)
+            setTimeout(() => setJustUpgraded(false), 30000)
             // 若正处于 diff 模式,刷新 diff 数据(最新版变了)
             if (diffBaseVersion !== null) {
               loadDiff(project.id, diffBaseVersion)

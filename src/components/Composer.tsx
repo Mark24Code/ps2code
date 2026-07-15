@@ -126,11 +126,10 @@ export function Composer(props: Props): JSX.Element {
                 <HistoryOutlined />
                 {latestVersion && (
                   <span className="version-badge">{latestVersion.label}
-                  <span className="version-upgrade-arrow"><ForwardOutlined /></span>
+                   {justUpgraded && (
+                      <span className="version-upgrade-arrow"><ForwardOutlined /></span>
+                    )}
                   </span>
-                )}
-                {justUpgraded && (
-                  <span className="version-upgrade-arrow"><ArrowUpOutlined /></span>
                 )}
               </span>
             }
