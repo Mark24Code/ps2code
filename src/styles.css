@@ -189,17 +189,26 @@ body {
   color: var(--text-3);
   flex: 0 0 auto;
 }
-.conv-row .conv-delete {
-  font-size: 12px;
-  color: var(--text-4);
-  opacity: 0;
-  transition: opacity .15s, color .15s;
+.conv-row .conv-actions {
+  display: flex;
   flex: 0 0 auto;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity .15s;
 }
-.conv-row:hover .conv-delete {
+.conv-row:hover .conv-actions {
   opacity: 1;
 }
-.conv-row .conv-delete:hover {
+.conv-row .conv-act-icon {
+  font-size: 12px;
+  color: var(--text-4);
+  transition: color .15s;
+  cursor: pointer;
+}
+.conv-row .conv-act-icon:hover {
+  color: var(--text-1);
+}
+.conv-row .conv-act-icon--danger:hover {
   color: #ff4d4f;
 }
 

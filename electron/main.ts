@@ -31,7 +31,7 @@ function setAppIcon(): void {
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1600,
-    height: 800,
+    height: 850,
     minWidth: 900,
     minHeight: 500,
     resizable: true,

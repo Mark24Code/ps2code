@@ -4,6 +4,7 @@ import { getLayerMeta } from '../psd/layerCache'
 import type { PsdLayerNode } from '../../../shared/types'
 import {
   exportGroups,
+  exportSelection,
   mutateLayers,
   renameGroups,
   setText,
@@ -274,6 +275,36 @@ export function createToolHandlers(deps: ToolDeps) {
       })
       emit({ type: 'tool_result', name: 'export_groups', text: res.log.join('\n') })
       // 把日志细节也注入到返回数据中,方便 Agent 定位失败原因
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ ...res.data, _log: res.log }) }],
+        isError: !res.ok || res.data.err > 0
+      }
+    },
+
+    // 按选区导出:用户先在 Photoshop 中框选区域(矩形选框/套索等),然后调用此工具只导出选区范围内的目标图层。
+    // 与 exportGroups 不同,此工具需要用户在 PS 中有激活的选区才会生效。
+    async exportSelection(args: {
+      targets: ExportTarget[]
+    }): Promise<ToolResult> {
+      const cur = getConversation(conversationId)!
+      const targets = args.targets ?? []
+
+      if (targets.length === 0) {
+        return {
+          content: [{ type: 'text', text: '没有可导出的目标。请先用 search_layers 定位图层并传入 targets。' }],
+          isError: true
+        }
+      }
+
+      const res = await exportSelection({
+        targetPath,
+        targets,
+        x1: cur.opt1x,
+        x2: cur.opt2x,
+        trim: cur.optTrim,
+        outputDir: cur.tmpDir
+      })
+      emit({ type: 'tool_result', name: 'export_selection', text: res.log.join('\n') })
       return {
         content: [{ type: 'text', text: JSON.stringify({ ...res.data, _log: res.log }) }],
         isError: !res.ok || res.data.err > 0

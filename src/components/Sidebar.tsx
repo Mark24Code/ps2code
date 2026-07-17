@@ -29,6 +29,7 @@ export interface SidebarProps {
   onDeleteConversation: (conv: Conversation) => void
   onDeleteProject: (project: Project) => void
   onRenameProject: (project: Project, name: string) => void
+  onRenameConversation: (conv: Conversation, title: string) => void
 }
 
 export function Sidebar(props: SidebarProps): JSX.Element {
@@ -45,7 +46,8 @@ export function Sidebar(props: SidebarProps): JSX.Element {
     onNewConversationInProject,
     onDeleteConversation,
     onDeleteProject,
-    onRenameProject
+    onRenameProject,
+    onRenameConversation
   } = props
   const { modal } = App.useApp()
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
@@ -54,6 +56,9 @@ export function Sidebar(props: SidebarProps): JSX.Element {
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null)
   const [editName, setEditName] = useState('')
   const editInputRef = useRef<any>(null)
+  const [editingConvId, setEditingConvId] = useState<string | null>(null)
+  const [editConvTitle, setEditConvTitle] = useState('')
+  const convEditInputRef = useRef<any>(null)
 
   const toggle = (projectId: number): void => {
     setExpanded((prev) => {
@@ -208,28 +213,68 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                     <div
                       key={c.id}
                       className={`conv-row ${isActive ? 'active' : ''}`}
-                      onClick={() => onSelectConversation(c)}
+                      onClick={() => {
+                        if (editingConvId !== c.id) onSelectConversation(c)
+                      }}
                     >
-                      <span className="conv-title" title={c.title}>
-                        {c.title}
-                      </span>
+                      {editingConvId === c.id ? (
+                        <Input
+                          ref={convEditInputRef}
+                          size="small"
+                          maxLength={30}
+                          value={editConvTitle}
+                          onChange={(e) => setEditConvTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const title = editConvTitle.trim()
+                              if (title && title !== c.title) onRenameConversation(c, title)
+                              setEditingConvId(null)
+                            } else if (e.key === 'Escape') {
+                              setEditingConvId(null)
+                            }
+                          }}
+                          onBlur={() => {
+                            const title = editConvTitle.trim()
+                            if (title && title !== c.title) onRenameConversation(c, title)
+                            setEditingConvId(null)
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ flex: 1, height: 24, minWidth: 0 }}
+                        />
+                      ) : (
+                        <span className="conv-title" title={c.title}>
+                          {c.title}
+                        </span>
+                      )}
                       {showBusyDot && <span className="conv-dot conv-dot-busy" title="进行中" />}
                       {showUnreadDot && <span className="conv-dot conv-dot-unread" title="有新结果" />}
                       <span className="conv-time">{relativeTime(c.updatedAt)}</span>
-                    <DeleteOutlined
-                      className="conv-delete"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        modal.confirm({
-                          title: '删除对话',
-                          content: `确定要删除「${c.title}」吗？此操作不可撤销。`,
-                          okText: '删除',
-                          okType: 'danger',
-                          cancelText: '取消',
-                          onOk: () => onDeleteConversation(c)
-                        })
-                      }}
-                    />
+                    <span className="conv-actions">
+                      <EditOutlined
+                        className="conv-act-icon"
+                        title="重命名"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingConvId(c.id)
+                          setEditConvTitle(c.title)
+                          setTimeout(() => convEditInputRef.current?.focus(), 0)
+                        }}
+                      />
+                      <DeleteOutlined
+                        className="conv-act-icon conv-act-icon--danger"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          modal.confirm({
+                            title: '删除对话',
+                            content: `确定要删除「${c.title}」吗？此操作不可撤销。`,
+                            okText: '删除',
+                            okType: 'danger',
+                            cancelText: '取消',
+                            onOk: () => onDeleteConversation(c)
+                          })
+                        }}
+                      />
+                    </span>
                   </div>
                   )
                 })}

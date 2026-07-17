@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { App, AutoComplete, Button, Card, Descriptions, Input, Select, Space, Tag, Tooltip, Typography } from 'antd'
-import { CopyOutlined, CheckOutlined } from '@ant-design/icons'
+import { App, AutoComplete, Button, Card, Descriptions, Input, Select, Space, Tabs, Tag, Tooltip, Typography } from 'antd'
+import { CopyOutlined, CheckOutlined, SettingOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import type { AppSettings } from '@shared/types'
 
 const empty: AppSettings = {
@@ -108,140 +108,156 @@ export function SettingsPage(): JSX.Element {
 
   return (
     <div style={{ maxWidth: 680, margin: '0 auto', padding: 24 }}>
-      <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-        <Card title="Photoshop" size="small">
-          <Space orientation="vertical" style={{ width: '100%' }}>
-            <Typography.Text type="secondary">Photoshop 路径(留空则自动探测)</Typography.Text>
-            <Space.Compact style={{ width: '100%' }}>
-              <Input
-                value={s.psPath}
-                placeholder={`自动检测: ${detected}`}
-                onChange={(e) => set({ psPath: e.target.value })}
-              />
-              <Button onClick={() => pick('psPath')}>选择</Button>
-              <Button loading={testing} onClick={testPs}>
-                测试连接
-              </Button>
-            </Space.Compact>
-          </Space>
-        </Card>
+      <Tabs
+        defaultActiveKey="settings"
+        items={[
+          {
+            key: 'settings',
+            label: <span><SettingOutlined /> 设置</span>,
+            children: (
+              <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+                <Card title="Photoshop" size="small">
+                  <Space orientation="vertical" style={{ width: '100%' }}>
+                    <Typography.Text type="secondary">Photoshop 路径(留空则自动探测)</Typography.Text>
+                    <Space.Compact style={{ width: '100%' }}>
+                      <Input
+                        value={s.psPath}
+                        placeholder={`自动检测: ${detected}`}
+                        onChange={(e) => set({ psPath: e.target.value })}
+                      />
+                      <Button onClick={() => pick('psPath')}>选择</Button>
+                      <Button loading={testing} onClick={testPs}>
+                        测试连接
+                      </Button>
+                    </Space.Compact>
+                  </Space>
+                </Card>
 
-        <Card title="API(Agent)" size="small">
-          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: -4 }}>
-            由 pi-agent 驱动,默认使用 DeepSeek(OpenAI 兼容协议)。密钥保存在 ~/.ps2code/auth.json。留空则回退对应 provider 的系统环境变量(如 DEEPSEEK_API_KEY)。
-          </Typography.Paragraph>
-          <Space orientation="vertical" style={{ width: '100%' }} size={12}>
-            <div>
-              <Typography.Text type="secondary">Provider</Typography.Text>
-              <Select
-                style={{ width: '100%' }}
-                value={s.apiProvider}
-                options={PROVIDERS}
-                onChange={(v) => set({ apiProvider: v })}
-              />
-            </div>
-            <div>
-              <Typography.Text type="secondary">API 密钥</Typography.Text>
-              <Input.Password
-                value={apiKey}
-                placeholder="sk-..."
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-            </div>
-            <div>
-              <Typography.Text type="secondary">模型</Typography.Text>
-              <AutoComplete
-                style={{ width: '100%' }}
-                value={s.apiModel}
-                options={(MODEL_SUGGESTIONS[s.apiProvider] ?? []).map((m) => ({ value: m }))}
-                onChange={(v) => set({ apiModel: v })}
-              >
-                <Input placeholder="deepseek-v4-flash" />
-              </AutoComplete>
-            </div>
-            <Button loading={checking} onClick={checkAgent}>
-              检查连接
-            </Button>
-          </Space>
-        </Card>
+                <Card title="API(Agent)" size="small">
+                  <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: -4 }}>
+                    由 pi-agent 驱动,默认使用 DeepSeek(OpenAI 兼容协议)。密钥保存在 ~/.ps2code/auth.json。留空则回退对应 provider 的系统环境变量(如 DEEPSEEK_API_KEY)。
+                  </Typography.Paragraph>
+                  <Space orientation="vertical" style={{ width: '100%' }} size={12}>
+                    <div>
+                      <Typography.Text type="secondary">Provider</Typography.Text>
+                      <Select
+                        style={{ width: '100%' }}
+                        value={s.apiProvider}
+                        options={PROVIDERS}
+                        onChange={(v) => set({ apiProvider: v })}
+                      />
+                    </div>
+                    <div>
+                      <Typography.Text type="secondary">API 密钥</Typography.Text>
+                      <Input.Password
+                        value={apiKey}
+                        placeholder="sk-..."
+                        onChange={(e) => setApiKey(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Typography.Text type="secondary">模型</Typography.Text>
+                      <AutoComplete
+                        style={{ width: '100%' }}
+                        value={s.apiModel}
+                        options={(MODEL_SUGGESTIONS[s.apiProvider] ?? []).map((m) => ({ value: m }))}
+                        onChange={(v) => set({ apiModel: v })}
+                      >
+                        <Input placeholder="deepseek-v4-flash" />
+                      </AutoComplete>
+                    </div>
+                    <Button loading={checking} onClick={checkAgent}>
+                      检查连接
+                    </Button>
+                  </Space>
+                </Card>
 
-        <Card title="导出" size="small">
-          <Typography.Text type="secondary">默认导出路径</Typography.Text>
-          <Space.Compact style={{ width: '100%' }}>
-            <Input
-              value={s.defaultExportDir}
-              placeholder="默认与设计稿同目录"
-              onChange={(e) => set({ defaultExportDir: e.target.value })}
-            />
-            <Button onClick={() => pick('defaultExportDir')}>选择</Button>
-          </Space.Compact>
-        </Card>
+                <Card title="导出" size="small">
+                  <Typography.Text type="secondary">默认导出路径</Typography.Text>
+                  <Space.Compact style={{ width: '100%' }}>
+                    <Input
+                      value={s.defaultExportDir}
+                      placeholder="默认与设计稿同目录"
+                      onChange={(e) => set({ defaultExportDir: e.target.value })}
+                    />
+                    <Button onClick={() => pick('defaultExportDir')}>选择</Button>
+                  </Space.Compact>
+                </Card>
 
-        <Card title="关于" size="small">
-          <Descriptions column={1} size="small" style={{ marginBottom: 8 }}>
-            <Descriptions.Item label="当前版本">{version}</Descriptions.Item>
-            <Descriptions.Item label="作者">Mark24Code</Descriptions.Item>
-            <Descriptions.Item label="项目主页">
-              <a
-                onClick={() => window.api.openExternal('https://github.com/Mark24Code/ps2code')}
-                style={{ cursor: 'pointer' }}
-              >
-                https://github.com/Mark24Code/ps2code
-              </a>
-            </Descriptions.Item>
-          </Descriptions>
-          <Space>
-            <Button onClick={check}>检查更新</Button>
-            {update && !update.error && update.hasUpdate && (
-              <>
-                <Tag color="blue">发现新版本 {update.latest}</Tag>
-                <Button
-                  type="primary"
-                  onClick={() => update.url && window.api.openExternal(update.url)}
-                >
-                  前往下载
+                <Button type="primary" onClick={save}>
+                  保存设置
                 </Button>
-              </>
-            )}
-            {update && !update.error && !update.hasUpdate && (
-              <Typography.Text type="secondary">已是最新版本</Typography.Text>
-            )}
-            {update?.error && <Typography.Text type="danger">{update.error}</Typography.Text>}
-          </Space>
-        </Card>
-
-        <Card title="设备信息" size="small">
-          <Descriptions column={1} size="small">
-            <Descriptions.Item label={
-              <Space size={4}>
-                <span>设备码</span>
-                <Tooltip title={copied ? '已复制' : '复制设备码'}>
-                  <span
-                    onClick={copyFingerprint}
-                    style={{ cursor: 'pointer', color: copied ? '#52c41a' : undefined }}
-                  >
-                    {copied ? <CheckOutlined /> : <CopyOutlined />}
-                  </span>
-                </Tooltip>
               </Space>
-            }>
-              <Typography.Text
-                code
-                copyable={false}
-                style={{ fontSize: 11, wordBreak: 'break-all' }}
-              >
-                {fingerprint || '加载中…'}
-              </Typography.Text>
-            </Descriptions.Item>
-          </Descriptions>
-          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 0 }}>
-          </Typography.Paragraph>
-        </Card>
+            )
+          },
+          {
+            key: 'about',
+            label: <span><InfoCircleOutlined /> 关于</span>,
+            children: (
+              <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+                <Card title="关于" size="small">
+                  <Descriptions column={1} size="small" style={{ marginBottom: 8 }}>
+                    <Descriptions.Item label="当前版本">{version}</Descriptions.Item>
+                    <Descriptions.Item label="作者">Mark24Code</Descriptions.Item>
+                    <Descriptions.Item label="项目主页">
+                      <a
+                        onClick={() => window.api.openExternal('https://github.com/Mark24Code/ps2code')}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        https://github.com/Mark24Code/ps2code
+                      </a>
+                    </Descriptions.Item>
+                  </Descriptions>
+                  <Space>
+                    <Button onClick={check}>检查更新</Button>
+                    {update && !update.error && update.hasUpdate && (
+                      <>
+                        <Tag color="blue">发现新版本 {update.latest}</Tag>
+                        <Button
+                          type="primary"
+                          onClick={() => update.url && window.api.openExternal(update.url)}
+                        >
+                          前往下载
+                        </Button>
+                      </>
+                    )}
+                    {update && !update.error && !update.hasUpdate && (
+                      <Typography.Text type="secondary">已是最新版本</Typography.Text>
+                    )}
+                    {update?.error && <Typography.Text type="danger">{update.error}</Typography.Text>}
+                  </Space>
+                </Card>
 
-        <Button type="primary" onClick={save}>
-          保存设置
-        </Button>
-      </Space>
+                <Card title="设备信息" size="small">
+                  <Descriptions column={1} size="small">
+                    <Descriptions.Item label={
+                      <Space size={4}>
+                        <span>设备码</span>
+                        <Tooltip title={copied ? '已复制' : '复制设备码'}>
+                          <span
+                            onClick={copyFingerprint}
+                            style={{ cursor: 'pointer', color: copied ? '#52c41a' : undefined }}
+                          >
+                            {copied ? <CheckOutlined /> : <CopyOutlined />}
+                          </span>
+                        </Tooltip>
+                      </Space>
+                    }>
+                      <Typography.Text
+                        code
+                        copyable={false}
+                        style={{ fontSize: 11, wordBreak: 'break-all' }}
+                      >
+                        {fingerprint || '加载中…'}
+                      </Typography.Text>
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Card>
+              </Space>
+            )
+          }
+        ]}
+      />
     </div>
   )
 }

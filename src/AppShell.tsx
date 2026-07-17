@@ -164,6 +164,12 @@ export function AppShell(): JSX.Element {
     await loadProjects()
   }
 
+  const onRenameConversation = async (conv: Conversation, title: string): Promise<void> => {
+    await window.api.convUpdate(conv.id, { title })
+    const project = projects.find((p) => p.id === conv.projectId)
+    if (project) await loadConvs(project.id)
+  }
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -180,6 +186,7 @@ export function AppShell(): JSX.Element {
         onDeleteConversation={onDeleteConversation}
         onDeleteProject={onDeleteProject}
         onRenameProject={onRenameProject}
+        onRenameConversation={onRenameConversation}
       />
       <div className="app-content">
         {view === 'welcome' && <WelcomeView onNewChat={onNewChat} onDropPsd={importAndStart} />}
