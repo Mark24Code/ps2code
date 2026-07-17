@@ -1,4 +1,4 @@
-# PS2Code v0.4.0
+# PS2Code
 
 通过 AI 对话驱动的 Photoshop 设计稿导出工具。连接本地 Adobe Photoshop，让 AI Agent 理解图层结构、执行切图导出，并自动追踪版本变更。
 
