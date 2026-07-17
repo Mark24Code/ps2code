@@ -106,6 +106,27 @@ export function mergeGroups(
   return runScript('merge-groups.jsx', { targetPath, targets })
 }
 
+// 按选区导出:读取用户在 Photoshop 中的选区(选框/套索),只导出该选区范围内的目标图层。
+export function exportSelection(
+  params: {
+    targetPath: string
+    targets: RawExportTarget[]
+    x1: boolean
+    x2: boolean
+    trim: boolean
+    outputDir: string
+  }
+): Promise<JsxResult<{ files: string[]; matched: number; ok: number; err: number; outputDir: string }>> {
+  return runScript('export-selection.jsx', {
+    targetPath: params.targetPath,
+    targets: toExportTargetParams(params.targets),
+    x1: params.x1,
+    x2: params.x2,
+    trim: params.trim,
+    outputDir: params.outputDir
+  })
+}
+
 // 单个导出目标:psId 用于在 PS 中精确定位(缺失则回退按名),
 // exportName 为最终文件名基名(叶子名_节点id,已做非法字符清洗)。
 // path/id 透传,便于导出后回写布局清单(无需从文件名反推)。
